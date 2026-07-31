@@ -14,26 +14,44 @@ const publicUser = (u) => ({
 });
 
 // Conductor IDs look like GJ015500 (GJ + digits)
-const isConductorId = (s) => /^gj\s?\d{3,}$/i.test(s.trim());
+const isEmail = (s) => /^\S+@\S+\.\S+$/.test(s);
 
-// POST /api/auth/login { identifier (mobile / email / conductor ID), password }
+// POST /api/auth/login — role-wise:
+//   PASSENGER: { role:"PASSENGER", mobile, email, password } — sab compulsory
+//   DRIVER:    { role:"DRIVER", conductorId, password }
+//   ADMIN:     { role:"ADMIN", email, password }
 r.post("/login", wrap(async (req, res) => {
-  const identifier = String(req.body.identifier || "").trim();
+  const role = String(req.body.role || "PASSENGER").toUpperCase();
   const password = String(req.body.password || "");
-  if (!identifier || !password) return badRequest(res, "Enter your mobile/email/conductor ID and password");
+  if (!password) return badRequest(res, "Password daalna zaroori hai");
 
   let user = null;
-  if (identifier.includes("@")) {
-    user = await prisma.user.findFirst({ where: { email: identifier.toLowerCase() } });
-  } else if (isConductorId(identifier)) {
-    const cid = identifier.replace(/\s/g, "").toUpperCase();
-    user = await prisma.user.findFirst({ where: { conductor_id: cid } });
-  } else {
-    const mobile = identifier.replace(/\D/g, "").slice(-10);
+  if (role === "PASSENGER") {
+    const mobile = String(req.body.mobile || "").replace(/\D/g, "").slice(-10);
+    const email = String(req.body.email || "").trim().toLowerCase();
+    if (!/^[6-9]\d{9}$/.test(mobile)) return badRequest(res, "Valid 10-digit mobile number daalo");
+    if (!isEmail(email)) return badRequest(res, "Valid email daalo");
     user = await prisma.user.findUnique({ where: { mobile } });
+    if (!user || (user.email || "").toLowerCase() !== email) {
+      return badRequest(res, "Mobile number aur email ka joda match nahi hua — registration wali details daalo");
+    }
+    if (user.role !== "PASSENGER") return badRequest(res, "Ye account passenger ka nahi hai — sahi role choose karo");
+  } else if (role === "ADMIN") {
+    const email = String(req.body.email || "").trim().toLowerCase();
+    if (!isEmail(email)) return badRequest(res, "Admin email daalo");
+    user = await prisma.user.findFirst({ where: { email, role: "ADMIN" } });
+    if (!user) return badRequest(res, "Ye email kisi admin account ka nahi hai");
+  } else if (role === "DRIVER") {
+    const cid = String(req.body.conductorId || "").replace(/\s/g, "").toUpperCase();
+    if (!/^GJ\d{3,}$/.test(cid)) return badRequest(res, "Conductor ID daalo (jaise GJ015500)");
+    user = await prisma.user.findFirst({ where: { conductor_id: cid, role: "DRIVER" } });
+    if (!user) return badRequest(res, "Ye Conductor ID registered nahi hai — admin se check karo");
+  } else {
+    return badRequest(res, "Invalid role");
   }
+
   if (!user || !verifyPassword(password, user.password_hash)) {
-    return badRequest(res, "Incorrect ID or password — please try again");
+    return badRequest(res, "Galat password — dubara try karo");
   }
   res.json({ token: signToken(user), user: publicUser(user) });
 }));
