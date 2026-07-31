@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma, bustCityCache } from "../db.js";
 import { authRequired } from "../middleware/auth.js";
-import { wrap, badRequest, notFound, dayStart, atTime, estDistanceKm, fareFor, durationMinFor, seatLayoutFor } from "../lib/util.js";
+import { wrap, badRequest, notFound, dayStart, atTime, estDistanceKm, fareFor, durationMinFor, seatLayoutFor, hashPassword } from "../lib/util.js";
 import { BUS_TYPES } from "../data/cities.js";
 
 const r = Router();
@@ -202,16 +202,27 @@ r.get("/drivers", wrap(async (_req, res) => {
     include: { _count: { select: { drivenTrips: true } } },
     orderBy: { id: "asc" },
   });
-  res.json({ drivers: drivers.map((d) => ({ id: d.id, name: d.name, mobile: d.mobile, trips: d._count.drivenTrips })) });
+  res.json({ drivers: drivers.map((d) => ({ id: d.id, name: d.name, mobile: d.mobile, conductor_id: d.conductor_id, trips: d._count.drivenTrips })) });
 }));
 
 r.post("/drivers", wrap(async (req, res) => {
   const name = String(req.body.name || "").trim();
   const mobile = String(req.body.mobile || "").replace(/\D/g, "").slice(-10);
+  const conductorId = String(req.body.conductorId || "").trim().toUpperCase();
+  const password = String(req.body.password || "");
   if (!name || !/^[6-9]\d{9}$/.test(mobile)) return badRequest(res, "Name and valid 10-digit mobile required");
-  const driver = await prisma.user.create({ data: { name, mobile, role: "DRIVER" } }).catch(() => null);
-  if (!driver) return res.status(409).json({ error: "Mobile already registered" });
-  res.json({ ok: true, driver });
+  if (!/^GJ\d{4,}$/.test(conductorId)) return badRequest(res, "Conductor ID must look like GJ015503");
+  if (password.length < 6) return badRequest(res, "Password must be at least 6 characters");
+  if (await prisma.user.findFirst({ where: { conductor_id: conductorId } })) {
+    return res.status(409).json({ error: "Ye Conductor ID pehle se registered hai" });
+  }
+  if (await prisma.user.findUnique({ where: { mobile } })) {
+    return res.status(409).json({ error: "Mobile already registered" });
+  }
+  const driver = await prisma.user.create({
+    data: { name, mobile, conductor_id: conductorId, role: "DRIVER", password_hash: hashPassword(password) },
+  });
+  res.json({ ok: true, driver: { id: driver.id, name: driver.name, mobile: driver.mobile, conductor_id: driver.conductor_id } });
 }));
 
 r.delete("/drivers/:id", wrap(async (req, res) => {

@@ -49,6 +49,29 @@ export const ROUTE_PAIRS = [
   ["Bardoli", "Vyara", 26], ["Vadodara", "Anand", 44], ["Rajkot", "Surendranagar", 116],
   ["Surat", "Bharuch", 70], ["Navsari", "Vyara", 52], ["Bhavnagar", "Amreli", 110],
   ["Gandhinagar", "Himmatnagar", 55], ["Gandhinagar", "Mehsana", 55],
+  // — More corridors: long-haul + district connectors (all 41 cities better linked) —
+  ["Ahmedabad", "Dwarka", 440], ["Ahmedabad", "Somnath", 420],
+  ["Ahmedabad", "Porbandar", 395], ["Ahmedabad", "Veraval", 412],
+  ["Ahmedabad", "Palanpur", 141], ["Ahmedabad", "Nadiad", 60],
+  ["Ahmedabad", "Bharuch", 195], ["Ahmedabad", "Godhra", 130],
+  ["Ahmedabad", "Patan", 125], ["Ahmedabad", "Modasa", 100],
+  ["Botad", "Ahmedabad", 130], ["Ahmedabad", "Deesa", 170],
+  ["Visnagar", "Ahmedabad", 72], ["Kalol", "Gandhinagar", 28],
+  ["Surat", "Rajkot", 440], ["Surat", "Bhavnagar", 170],
+  ["Surat", "Ankleshwar", 60], ["Surat", "Godhra", 225],
+  ["Vyara", "Surat", 60], ["Bardoli", "Navsari", 42],
+  ["Valsad", "Vapi", 28], ["Vapi", "Vadodara", 230],
+  ["Vadodara", "Rajkot", 290], ["Vadodara", "Bhavnagar", 200],
+  ["Vadodara", "Surendranagar", 235], ["Vadodara", "Navsari", 145],
+  ["Nadiad", "Vadodara", 52], ["Bharuch", "Rajpipla", 55],
+  ["Ankleshwar", "Rajpipla", 65], ["Rajkot", "Bhavnagar", 175],
+  ["Rajkot", "Dwarka", 225], ["Rajkot", "Veraval", 185],
+  ["Amreli", "Rajkot", 130], ["Wankaner", "Rajkot", 45],
+  ["Bhavnagar", "Surendranagar", 140], ["Bhuj", "Rajkot", 230],
+  ["Jamnagar", "Bhuj", 245], ["Gandhidham", "Jamnagar", 295],
+  ["Gandhidham", "Morbi", 155], ["Morbi", "Jamnagar", 120],
+  ["Porbandar", "Dwarka", 105], ["Junagadh", "Dwarka", 205],
+  ["Una", "Veraval", 90], ["Anand", "Godhra", 95],
 ];
 
 export const BUS_TYPES = {
@@ -69,6 +92,19 @@ export const BUSES = [
   { bus_number: "GJ-27-AJ-5001", operator_name: "GreenLine Mobility", type: "AC_SLEEPER" },
   { bus_number: "GJ-18-VV-6001", operator_name: "GSRTC Volvo Service", type: "AC_SEATER" },
   { bus_number: "GJ-01-KD-7001", operator_name: "Jalaram Travels", type: "NON_AC_SEATER" },
+  // — Expanded fleet: more buses on every corridor —
+  { bus_number: "GJ-27-AM-8001", operator_name: "Shrinath Travels", type: "AC_SLEEPER" },
+  { bus_number: "GJ-01-CB-8002", operator_name: "Kanaiya Travels", type: "SEMI_SLEEPER" },
+  { bus_number: "GJ-05-GN-8003", operator_name: "Chartered Travels", type: "AC_SEATER" },
+  { bus_number: "GJ-03-SR-8004", operator_name: "Sagar Express", type: "NON_AC_SEATER" },
+  { bus_number: "GJ-10-DD-8005", operator_name: "Dwarkadhish Travels", type: "SEMI_SLEEPER" },
+  { bus_number: "GJ-18-PM-8006", operator_name: "Pavagadh Express", type: "NON_AC_SEATER" },
+  { bus_number: "GJ-01-AB-8007", operator_name: "GBS Volvo Premium", type: "AC_SLEEPER" },
+  { bus_number: "GJ-12-BV-8008", operator_name: "Bhavnagar Shakti", type: "AC_SEATER" },
+  { bus_number: "GJ-06-SK-8009", operator_name: "Saurashtra Kutch Link", type: "NON_AC_SEATER" },
+  { bus_number: "GJ-02-SN-8010", operator_name: "Sabarmati Travels", type: "SEMI_SLEEPER" },
+  { bus_number: "GJ-08-VD-8011", operator_name: "Vande Gujarat", type: "AC_SEATER" },
+  { bus_number: "GJ-25-PR-8012", operator_name: "Prabhat Travels", type: "AC_SLEEPER" },
 ];
 
 export const REVIEW_SNIPPETS = [

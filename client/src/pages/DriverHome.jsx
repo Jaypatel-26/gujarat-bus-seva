@@ -39,7 +39,7 @@ export default function DriverHome() {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="font-display text-xl font-bold md:text-2xl">Driver Console</h1>
-          <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Driver"} 🙏 — today's schedule</p>
+          <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Conductor"} 🙏{user?.conductor_id ? <span className="ml-1 rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-700">{user.conductor_id}</span> : null} — today's schedule</p>
         </div>
         <span className="text-3xl">🚍</span>
       </div>

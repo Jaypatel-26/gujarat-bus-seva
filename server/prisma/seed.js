@@ -27,28 +27,40 @@ const NAMES = ["Amit Patel", "Priya Shah", "Rahul Mehta", "Kinjal Desai", "Hardi
 async function main() {
   const force = process.argv.includes("--force");
 
-  // Ensure demo logins always have a password (also fixes DBs seeded before passwords existed)
-  const DEMO_PW = {
-    "9876543210": "demo123",
-    "9000000001": "admin123",
-    "9000000002": "driver123",
-    "9000000003": "driver123",
-    "9000000004": "driver123",
-  };
-  for (const [mobile, pw] of Object.entries(DEMO_PW)) {
-    const u = await prisma.user.findUnique({ where: { mobile } });
-    if (u && !u.password_hash) {
-      await prisma.user.update({ where: { mobile }, data: { password_hash: hashPassword(pw) } });
+  // Ensure demo logins always carry known credentials (also fixes DBs seeded before these existed)
+  const DEMO_ACCOUNTS = [
+    { name: "GBS Admin", mobile: "9000000001", role: "ADMIN", email: "admin@gmail.com", password: "admin123" },
+    { name: "Mahesh Chauhan", mobile: "9000000002", role: "DRIVER", conductorId: "GJ015500", password: "conductor123" },
+    { name: "Baldev Rathod", mobile: "9000000003", role: "DRIVER", conductorId: "GJ015501", password: "conductor123" },
+    { name: "Suresh Damor", mobile: "9000000004", role: "DRIVER", conductorId: "GJ015502", password: "conductor123" },
+    { name: "Demo Passenger", mobile: "9876543210", role: "PASSENGER", email: "demo@gujaratbusseva.in", password: "demo123" },
+  ];
+  for (const acc of DEMO_ACCOUNTS) {
+    const u = await prisma.user.findUnique({ where: { mobile: acc.mobile } });
+    if (u) {
+      await prisma.user.update({
+        where: { mobile: acc.mobile },
+        data: {
+          role: acc.role,
+          email: acc.email ?? u.email,
+          conductor_id: acc.conductorId ?? u.conductor_id,
+          password_hash: hashPassword(acc.password),
+        },
+      });
     }
   }
 
   const cityCount = await prisma.city.count();
-  if (cityCount > 0 && !force) {
+  const routeCount = await prisma.route.count();
+  const busCount = await prisma.bus.count();
+  // Auto-reseed when seed data (routes/buses) grows beyond what's in the DB
+  const stale = cityCount > 0 && (routeCount !== ROUTE_PAIRS.length * 2 || busCount !== BUSES.length);
+  if (cityCount > 0 && !force && !stale) {
     console.log("ℹ️  Database already seeded — skipping (use `node prisma/seed.js --force` to reset).");
     return;
   }
-  if (force) {
-    console.log("♻️  Clearing existing data…");
+  if (force || stale) {
+    console.log(force ? "♻️  Clearing existing data…" : "♻️  Routes/buses changed — reseeding fresh data…");
     for (const m of ["bookingSeat", "bookingPassenger", "payment", "liveLocation", "review", "booking", "trip", "seat", "bus", "route", "user", "city"]) {
       await prisma[m].deleteMany().catch(() => {});
     }
@@ -60,11 +72,11 @@ async function main() {
   });
 
   console.log("👥 Seeding users (admin / drivers / passengers)…");
-  await prisma.user.create({ data: { name: "GBS Admin", mobile: "9000000001", role: "ADMIN", email: "admin@gujaratbusseva.in", password_hash: hashPassword("admin123") } });
+  await prisma.user.create({ data: { name: "GBS Admin", mobile: "9000000001", role: "ADMIN", email: "admin@gmail.com", password_hash: hashPassword("admin123") } });
   const drivers = [];
   const DRIVER_NAMES = ["Mahesh Chauhan", "Baldev Rathod", "Suresh Damor"];
   for (let i = 0; i < 3; i++) {
-    drivers.push(await prisma.user.create({ data: { name: DRIVER_NAMES[i], mobile: `900000000${i + 2}`, role: "DRIVER", password_hash: hashPassword("driver123") } }));
+    drivers.push(await prisma.user.create({ data: { name: DRIVER_NAMES[i], mobile: `900000000${i + 2}`, role: "DRIVER", conductor_id: `GJ01550${i}`, password_hash: hashPassword("conductor123") } }));
   }
   await prisma.user.create({ data: { name: "Demo Passenger", mobile: "9876543210", role: "PASSENGER", email: "demo@gujaratbusseva.in", password_hash: hashPassword("demo123") } });
   const passengers = [];
@@ -102,17 +114,17 @@ async function main() {
 
   console.log("🕒 Seeding trips (yesterday → +4 days)…");
   const SLOT_POOLS = [
-    [[6, 15], [13, 0], [22, 30]],
-    [[8, 0], [15, 45], [23, 15]],
-    [[9, 30], [18, 30], [23, 55]],
-    [[7, 0], [14, 0], [21, 45]],
+    [[5, 45], [9, 30], [13, 0], [17, 15], [22, 30]],
+    [[6, 15], [10, 0], [14, 30], [18, 45], [23, 15]],
+    [[7, 30], [11, 0], [15, 45], [19, 30], [23, 55]],
+    [[8, 0], [12, 0], [16, 30], [20, 45], [21, 45]],
   ];
   const tripData = [];
   for (const route of routes) {
     const pool = SLOT_POOLS[route.id % SLOT_POOLS.length];
     for (let offset = -1; offset <= 4; offset++) {
       const day = localDay(offset);
-      const nTrips = 2 + (route.id + offset + 6) % 2; // 2–3 departures per day
+      const nTrips = 3 + (route.id + offset + 6) % 3; // 3–5 departures per day
       for (let i = 0; i < nTrips; i++) {
         const [h, m] = pool[i];
         const bus = busRows[(route.id + i * 3) % busRows.length];
@@ -211,8 +223,10 @@ async function main() {
     users: await prisma.user.count(), reviews: await prisma.review.count(),
   };
   console.log("✅ Seed complete:", counts);
-  console.log("\n🔑 Demo logins (OTP is returned as devOtp in development):");
-  console.log("   Passenger: 9876543210 / demo123 | Admin: 9000000001 / admin123 | Driver: 9000000002 / driver123\n");
+  console.log("\n🔑 Demo logins (password-based):");
+  console.log("   Passenger: 9876543210 / demo123");
+  console.log("   Admin:     admin@gmail.com / admin123");
+  console.log("   Conductor: GJ015500 / conductor123\n");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

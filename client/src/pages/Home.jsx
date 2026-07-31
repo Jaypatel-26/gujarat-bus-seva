@@ -125,7 +125,7 @@ export default function Home() {
             { icon: <Radar size={22} />, title: "Live Bus Tracking", text: "Watch your bus move on the map in real time, with ETA and next-stop updates.", tone: "text-brand-500 bg-brand-50" },
             { icon: <Ticket size={22} />, title: "QR E-Tickets", text: "Instant PDF ticket with a QR code — just show your phone while boarding.", tone: "text-saffron-600 bg-saffron-50" },
             { icon: <RefreshCcw size={22} />, title: "Easy Cancellations", text: "Plans change? Cancel in one tap and get your refund automatically.", tone: "text-leaf-600 bg-leaf-50" },
-            { icon: <ShieldCheck size={22} />, title: "Safe & Secure", text: "Razorpay payments, verified operators and OTP-secured accounts.", tone: "text-danger-600 bg-danger-50" },
+            { icon: <ShieldCheck size={22} />, title: "Safe & Secure", text: "Razorpay payments, verified operators and password-secured accounts.", tone: "text-danger-600 bg-danger-50" },
           ].map((f, i) => (
             <motion.div key={f.title} {...fadeUp} transition={{ ...fadeUp.transition, delay: i * 0.07 }}
               className="card p-5 transition hover:-translate-y-1 hover:shadow-lift">

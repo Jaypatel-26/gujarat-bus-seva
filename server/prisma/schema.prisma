@@ -16,6 +16,7 @@ model User {
   name          String?
   mobile        String    @unique
   email         String?
+  conductor_id  String?
   password_hash String?
   role          String    @default("PASSENGER") // PASSENGER | ADMIN | DRIVER
   created_at    DateTime  @default(now())
