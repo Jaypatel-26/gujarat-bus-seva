@@ -34,28 +34,30 @@ function pointAtFraction(pts, totalKm, f) {
 function StationBillboard({ p, side, idx }) {
   const k = KIND[p.s.kind];
   const isEnd = p.s.kind !== "STOP";
-  const anchorX = p.s.kind === "BOARDING" ? "translateX(-16%)" : p.s.kind === "DROP" ? "translateX(-84%)" : "translateX(-50%)";
+  const anchorX = p.s.kind === "BOARDING" ? "translateX(-12%)" : p.s.kind === "DROP" ? "translateX(-88%)" : "translateX(-50%)";
   const lift = side === "above" ? "translateY(-100%)" : "";
 
   const card = (
     <motion.div
       initial={{ opacity: 0, y: side === "above" ? 12 : -12, scale: 0.75 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ scale: 1.14, rotateX: 10, y: side === "above" ? -6 : 6, boxShadow: "0 22px 44px -10px rgba(15,76,129,0.45)" }}
       transition={{ delay: 0.5 + idx * 0.15, type: "spring", stiffness: 210, damping: 17 }}
-      className="flex w-[136px] flex-col justify-center rounded-xl border bg-white/95 px-2 py-1.5 text-center shadow-lift backdrop-blur"
-      style={{ borderColor: k.color, minHeight: p.s.kind === "STOP" ? 54 : 40 }}
+      className="flex w-[150px] cursor-pointer flex-col justify-center rounded-xl border-2 bg-white/95 px-2.5 py-2 text-center shadow-lift backdrop-blur"
+      style={{ borderColor: k.color, transformStyle: "preserve-3d" }}
     >
-      <p className="truncate text-[13px] font-bold text-slate-800">{p.s.name}</p>
-      <p className="text-[11px] font-semibold" style={{ color: k.color }}>
+      <p className="truncate text-[13.5px] font-bold text-slate-800">{p.s.name}</p>
+      <p className="text-[11px] font-semibold leading-snug" style={{ color: k.color }}>
         {p.s.kind === "BOARDING" && `${fmtTime(p.s.dep)} se chalegi`}
         {p.s.kind === "DROP" && `${fmtTime(p.s.arr)} pahunchegi`}
         {p.s.kind === "STOP" && `${fmtTime(p.s.arr)} – ${fmtTime(p.s.dep)}`}
       </p>
       {p.s.meal && <p className="text-[9.5px] font-semibold text-amber-600">🍽️ refreshment 15m</p>}
+      {p.s.km > 0 && <p className="text-[9px] font-semibold text-slate-400">{p.s.km} km from start</p>}
     </motion.div>
   );
 
-  const pole = <span className="block w-0.5 shrink-0" style={{ background: `${k.color}66`, height: 24 }} />;
+  const pole = <span className="pointer-events-none block w-0.5 shrink-0" style={{ background: `${k.color}66`, height: 22 }} />;
   const pin = (
     <motion.span
       initial={{ scale: 0 }} animate={{ scale: 1 }}
@@ -72,11 +74,10 @@ function StationBillboard({ p, side, idx }) {
 
   return (
     <div
-      className="absolute z-[5] flex flex-col items-center"
-      style={{ left: `${sx(p.x)}%`, top: `${sy(p.y)}%`, transform: `${anchorX} ${lift}` }}
+      className="absolute z-[5] flex flex-col items-center hover:z-30"
+      style={{ left: `${sx(p.x)}%`, top: `${sy(p.y)}%`, transform: `${anchorX} ${lift}`, perspective: "500px" }}
     >
       {side === "above" ? <>{card}{pole}{pin}</> : <>{pin}{pole}{card}</>}
-      <span className="mt-1 rounded-full bg-white/80 px-1.5 text-[10px] font-bold text-slate-500 shadow-sm order-last">{p.s.km} km</span>
     </div>
   );
 }
@@ -237,12 +238,6 @@ export default function RouteVision() {
                     <span className="block text-[34px] leading-none drop-shadow-[0_8px_8px_rgba(15,76,129,0.35)]">🚌</span>
                   </motion.div>
                   <span className="mx-auto block h-2 w-8 rounded-[50%] bg-brand-900/20 blur-[3px]" />
-                  <motion.span
-                    initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 3.2 }}
-                    className="mt-1 block whitespace-nowrap rounded-full bg-ink/85 px-2 py-0.5 text-[10px] font-bold text-white"
-                  >
-                    {nowInfo ? `${nowInfo.kmNow} km cover` : "pura preview 🎬"}
-                  </motion.span>
                 </motion.div>
               )}
             </div>
