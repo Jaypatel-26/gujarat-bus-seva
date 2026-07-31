@@ -5,20 +5,52 @@ import { wrap, badRequest, genOtp, signToken, OTP_TTL_MS } from "../lib/util.js"
 const r = Router();
 const otpStore = new Map(); // mobile -> { otp, expiresAt }
 
+// Sends the OTP by SMS using Twilio REST API (no SDK needed).
+// Returns true only if the SMS was accepted by Twilio.
+async function sendSmsOtp(mobile, otp) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!sid || !token || !from) return false;
+  try {
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: "POST",
+      headers: {
+        Authorization: "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        To: `+91${mobile}`,
+        From: from,
+        Body: `Gujarat Bus Seva: aapka OTP hai ${otp}. Ye 10 minute tak valid hai. Kisi ko share na karein.`,
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error("[sms] Twilio error:", res.status, txt.slice(0, 300));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("[sms] send failed:", e.message);
+    return false;
+  }
+}
+
 // POST /api/auth/otp/request { mobile }
 r.post("/otp/request", wrap(async (req, res) => {
   const mobile = String(req.body.mobile || "").replace(/\D/g, "").slice(-10);
   if (!/^[6-9]\d{9}$/.test(mobile)) return badRequest(res, "Enter a valid 10-digit Indian mobile number");
   const otp = genOtp();
   otpStore.set(mobile, { otp, expiresAt: Date.now() + OTP_TTL_MS });
-  // NOTE: plug Twilio/Firebase here for real SMS. Until SMS creds exist, echo the OTP
-  // back as devOtp (even in production) so demo login works on the live site.
-  const smsConfigured = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+  // Real SMS via Twilio when creds exist; otherwise echo devOtp so demo login still works.
   const existing = await prisma.user.findUnique({ where: { mobile } });
+  const smsSent = await sendSmsOtp(mobile, otp);
   res.json({
     ok: true,
     isNewUser: !existing,
-    devOtp: smsConfigured ? undefined : otp,
+    smsSent,
+    devOtp: smsSent ? undefined : otp,
   });
 }));
 
