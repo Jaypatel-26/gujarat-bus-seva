@@ -1,11 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Database, ClipboardList, Radar } from "lucide-react";
+import { LayoutDashboard, Database, ClipboardList } from "lucide-react";
 
 const NAV = [
   { to: "/admin", end: true, icon: <LayoutDashboard size={16} />, label: "Dashboard" },
   { to: "/admin/data", icon: <Database size={16} />, label: "Routes & Fleet" },
   { to: "/admin/bookings", icon: <ClipboardList size={16} />, label: "Bookings" },
-  { to: "/admin/fleet", icon: <Radar size={16} />, label: "Live Fleet Map" },
 ];
 
 export default function AdminLayout() {

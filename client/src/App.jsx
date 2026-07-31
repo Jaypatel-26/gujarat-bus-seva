@@ -12,12 +12,13 @@ import Ticket from "./pages/Ticket";
 import MyBookings from "./pages/MyBookings";
 import Track from "./pages/Track";
 import Login from "./pages/Login";
+import About from "./pages/About";
+import Help from "./pages/Help";
 import DriverHome from "./pages/DriverHome";
 import AdminLayout from "./pages/admin/AdminLayout";
 import Dashboard from "./pages/admin/Dashboard";
 import DataManager from "./pages/admin/DataManager";
 import BookingsAdmin from "./pages/admin/BookingsAdmin";
-import Fleet from "./pages/admin/Fleet";
 import { useAuth } from "./store";
 
 function ScrollToTop() {
@@ -50,13 +51,14 @@ export default function App() {
             <Route path="/ticket/:pnr" element={<Protected><Ticket /></Protected>} />
             <Route path="/bookings" element={<Protected><MyBookings /></Protected>} />
             <Route path="/track/:tripId" element={<Track />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/help" element={<Help />} />
             <Route path="/login" element={<Login />} />
             <Route path="/driver" element={<Protected roles={["DRIVER", "ADMIN"]}><DriverHome /></Protected>} />
             <Route path="/admin" element={<Protected roles={["ADMIN"]}><AdminLayout /></Protected>}>
               <Route index element={<Dashboard />} />
               <Route path="data" element={<DataManager />} />
               <Route path="bookings" element={<BookingsAdmin />} />
-              <Route path="fleet" element={<Fleet />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

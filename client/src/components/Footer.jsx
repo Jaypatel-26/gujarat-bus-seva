@@ -22,6 +22,7 @@ export default function Footer() {
             <h4 className="label">Quick Links</h4>
             <ul className="space-y-2 text-sm text-slate-600">
               <li><Link className="hover:text-brand-600" to="/">Search Buses</Link></li>
+              <li><Link className="hover:text-brand-600" to="/about">About Us</Link></li>
               <li><Link className="hover:text-brand-600" to="/bookings">My Bookings</Link></li>
               <li><Link className="hover:text-brand-600" to="/login">Login / Signup</Link></li>
               <li><Link className="hover:text-brand-600" to="/driver">Driver Console</Link></li>
@@ -30,6 +31,7 @@ export default function Footer() {
           <div>
             <h4 className="label">Support</h4>
             <ul className="space-y-2 text-sm text-slate-600">
+              <li><Link className="hover:text-brand-600" to="/help">Help & Refund Policy</Link></li>
               <li>Helpline: <span className="font-semibold text-brand-600">1800-419-0001</span></li>
               <li>support@gujaratbusseva.in</li>
               <li>Free cancellation up to 6h before departure</li>
