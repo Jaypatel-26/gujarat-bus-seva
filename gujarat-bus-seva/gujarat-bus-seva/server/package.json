@@ -1,0 +1,27 @@
+{
+  "name": "gbs-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gujarat Bus Seva — backend (Express + Prisma + Socket.IO)",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "build": "prisma generate",
+    "seed": "node prisma/seed.js",
+    "setup:local": "node scripts/setup-local.js && prisma generate --schema=prisma/schema.local.prisma && prisma db push --schema=prisma/schema.local.prisma --skip-generate",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "express": "4.21.1",
+    "jsonwebtoken": "9.0.2",
+    "pdfkit": "0.15.1",
+    "prisma": "5.22.0",
+    "qrcode": "1.5.4",
+    "razorpay": "2.9.5",
+    "socket.io": "4.8.1"
+  }
+}

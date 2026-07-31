@@ -1,0 +1,53 @@
+# 🚌 Gujarat Bus Seva — Render Blueprint
+# Push this repo to GitHub → Render Dashboard → "New" → "Blueprint" → select repo. Done.
+
+services:
+  # ---------- Backend API + Socket.IO ----------
+  - type: web
+    name: gbs-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && npx prisma db push && node prisma/seed.js
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gbs-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_URL
+        value: https://gujarat-bus-seva.onrender.com
+      - key: SIM_SPEED
+        value: "100"
+      # Add real keys in the dashboard to switch off demo payment mode:
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+
+  # ---------- Frontend (static site) ----------
+  - type: web
+    name: gujarat-bus-seva
+    runtime: static
+    plan: free
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://gbs-api.onrender.com
+
+databases:
+  - name: gbs-db
+    plan: free
+    databaseName: gbs_db
