@@ -45,6 +45,7 @@ model Route {
   to_city_id   Int
   distance_km  Float
   base_fare    Float
+  stops_json   String?  // admin-defined intermediate stations: [{name, arrOffset, depOffset}] (minutes from trip departure)
   fromCity     City     @relation("FromCity", fields: [from_city_id], references: [id])
   toCity       City     @relation("ToCity", fields: [to_city_id], references: [id])
   trips        Trip[]

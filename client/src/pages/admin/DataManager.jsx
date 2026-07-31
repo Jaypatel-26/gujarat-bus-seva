@@ -31,28 +31,48 @@ function RoutesTab() {
   const [routes, setRoutes] = useState(null);
   const [cities, setCities] = useState([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ from_city_id: "", to_city_id: "", distance_km: "" });
+  const EMPTY = { from_city_id: "", to_city_id: "", distance_km: "", base_fare: "", dep_time: "", arr_time: "", stops: [] };
+  const [form, setForm] = useState(EMPTY);
 
   const load = () => api("/admin/routes").then((d) => setRoutes(d.routes));
   useEffect(() => { load(); loadCities().then(setCities); }, []);
 
+  const setStop = (i, patch) => setForm({ ...form, stops: form.stops.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
+  const addStop = () => setForm({ ...form, stops: [...form.stops, { name: "", arr: "", dep: "" }] });
+  const rmStop = (i) => setForm({ ...form, stops: form.stops.filter((_, j) => j !== i) });
+
   const add = async () => {
     try {
-      await api("/admin/routes", { method: "POST", body: { ...form, from_city_id: Number(form.from_city_id), to_city_id: Number(form.to_city_id), distance_km: form.distance_km ? Number(form.distance_km) : undefined } });
-      toast.ok("Route added"); setOpen(false); setForm({ from_city_id: "", to_city_id: "", distance_km: "" }); load();
+      const d = await api("/admin/routes", {
+        method: "POST",
+        body: {
+          from_city_id: Number(form.from_city_id),
+          to_city_id: Number(form.to_city_id),
+          distance_km: form.distance_km ? Number(form.distance_km) : undefined,
+          base_fare: form.base_fare ? Number(form.base_fare) : undefined,
+          dep_time: form.dep_time || undefined,
+          arr_time: form.arr_time || undefined,
+          stops: form.stops.filter((s) => s.name),
+        },
+      });
+      toast.ok(`Route added${d.tripsCreated ? ` + ${d.tripsCreated} trips schedule ho gaye` : ""} ✅`);
+      setOpen(false); setForm(EMPTY); load();
     } catch (e) { toast.err(e.message); }
   };
+
   const del = async (id) => {
     try { await api(`/admin/routes/${id}`, { method: "DELETE" }); toast.ok("Route deleted"); load(); }
     catch (e) { toast.err(e.message); }
   };
 
   if (!routes) return <Skeleton className="h-72 w-full" />;
+  const stopCityOptions = cities.filter((c) => String(c.id) !== String(form.from_city_id) && String(c.id) !== String(form.to_city_id));
+
   return (
     <div className="card overflow-x-auto p-5">
       <Row title={`Routes (${routes.length})`} onAdd={() => setOpen(true)} addLabel="+ Add route" />
       <table className="w-full min-w-[560px]">
-        <thead><tr><th className="th">From</th><th className="th">To</th><th className="th">Distance</th><th className="th">Base Fare</th><th className="th">Trips</th><th className="th"></th></tr></thead>
+        <thead><tr><th className="th">From</th><th className="th">To</th><th className="th">Distance</th><th className="th">Base Fare</th><th className="th">Stations</th><th className="th">Trips</th><th className="th"></th></tr></thead>
         <tbody>
           {routes.map((r) => (
             <tr key={r.id} className="hover:bg-mist/60">
@@ -60,24 +80,68 @@ function RoutesTab() {
               <td className="td font-medium">{r.toCity.name}</td>
               <td className="td">{r.distance_km} km</td>
               <td className="td">{inr(r.base_fare)}</td>
+              <td className="td">{r.stops_json ? JSON.parse(r.stops_json).length : "auto"}</td>
               <td className="td">{r._count.trips}</td>
               <td className="td text-right"><button className="text-xs font-semibold text-danger-600 hover:underline" onClick={() => del(r.id)}>Delete</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <Modal open={open} onClose={() => setOpen(false)} title="Add route">
-        <div className="space-y-3">
-          <div><label className="label">From city</label>
-            <select className="input" value={form.from_city_id} onChange={(e) => setForm({ ...form, from_city_id: e.target.value })}>
-              <option value="">Select…</option>{cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select></div>
-          <div><label className="label">To city</label>
-            <select className="input" value={form.to_city_id} onChange={(e) => setForm({ ...form, to_city_id: e.target.value })}>
-              <option value="">Select…</option>{cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select></div>
-          <div><label className="label">Distance (km) — leave blank to auto-estimate</label>
-            <input className="input" type="number" value={form.distance_km} onChange={(e) => setForm({ ...form, distance_km: e.target.value })} placeholder="auto" /></div>
+      <Modal open={open} onClose={() => setOpen(false)} title="Add route" maxW="max-w-lg">
+        <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">From city</label>
+              <select className="input" value={form.from_city_id} onChange={(e) => setForm({ ...form, from_city_id: e.target.value })}>
+                <option value="">Select…</option>{cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select></div>
+            <div><label className="label">To city</label>
+              <select className="input" value={form.to_city_id} onChange={(e) => setForm({ ...form, to_city_id: e.target.value })}>
+                <option value="">Select…</option>{cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Distance (km)</label>
+              <input className="input" type="number" value={form.distance_km} onChange={(e) => setForm({ ...form, distance_km: e.target.value })} placeholder="auto" /></div>
+            <div><label className="label">Price / fare (₹)</label>
+              <input className="input" type="number" value={form.base_fare} onChange={(e) => setForm({ ...form, base_fare: e.target.value })} placeholder="auto" /></div>
+          </div>
+
+          <div className="rounded-xl border border-brand-100 bg-brand-50/50 p-3">
+            <p className="label !mb-2 text-brand-700">⏰ Trip timing (kabhi se kabhi tak)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label">Bus chalegi (departure)</label>
+                <input className="input" type="time" value={form.dep_time} onChange={(e) => setForm({ ...form, dep_time: e.target.value })} /></div>
+              <div><label className="label">Bus pahunchegi (arrival)</label>
+                <input className="input" type="time" value={form.arr_time} onChange={(e) => setForm({ ...form, arr_time: e.target.value })} placeholder="auto" /></div>
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-500">Time doge to agle 4 din ke trips apne aap schedule ho jayenge. Arrival blank = auto-estimate.</p>
+          </div>
+
+          <div className="rounded-xl border border-saffron-200 bg-saffron-50/60 p-3">
+            <div className="flex items-center justify-between">
+              <p className="label !mb-0 text-saffron-700">🚏 Beech ke stations (time ke saath)</p>
+              <button type="button" className="chip border border-saffron-300 bg-white text-saffron-700 hover:bg-saffron-100" onClick={addStop}>+ Add station</button>
+            </div>
+            {form.stops.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Station add nahi karoge to system apne aap route line ke paas wale cities choose karega.</p>}
+            {form.stops.length > 0 && !form.dep_time && <p className="mt-2 text-[11px] font-semibold text-danger-600">⚠️ Stations ke liye upar "Bus chalegi" time bhi do</p>}
+            {form.stops.map((s, i) => (
+              <div key={i} className="mt-2 flex items-end gap-2">
+                <div className="min-w-0 flex-1">
+                  <label className="label">Station {i + 1}</label>
+                  <select className="input !py-2 text-xs" value={s.name} onChange={(e) => setStop(i, { name: e.target.value })}>
+                    <option value="">Select…</option>
+                    {stopCityOptions.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="w-[92px]"><label className="label">Aayegi</label>
+                  <input className="input !px-2 !py-2 text-xs" type="time" value={s.arr} onChange={(e) => setStop(i, { arr: e.target.value })} /></div>
+                <div className="w-[92px]"><label className="label">Chalegi</label>
+                  <input className="input !px-2 !py-2 text-xs" type="time" value={s.dep} onChange={(e) => setStop(i, { dep: e.target.value })} /></div>
+                <button type="button" className="mb-1 text-danger-500 hover:text-danger-700" onClick={() => rmStop(i)}>✕</button>
+              </div>
+            ))}
+          </div>
+
           <button className="btn-primary w-full" onClick={add} disabled={!form.from_city_id || !form.to_city_id}>Save route</button>
         </div>
       </Modal>

@@ -136,13 +136,79 @@ r.post("/routes", wrap(async (req, res) => {
   if (!fromId || !toId || fromId === toId) return badRequest(res, "Pick two different cities");
   const [a, b] = await Promise.all([prisma.city.findUnique({ where: { id: fromId } }), prisma.city.findUnique({ where: { id: toId } })]);
   if (!a || !b) return badRequest(res, "Unknown city");
+
   const km = Number(req.body.distance_km) || estDistanceKm([a.lat, a.lng], [b.lat, b.lng]);
+  const customFare = Number(req.body.base_fare) || 0;
+  const baseFare = customFare || fareFor("NON_AC_SEATER", km);
+
+  // Optional trip timing (HH:MM) + admin-defined stations with arrival/departure times
+  const hhmm = /^\d{1,2}:\d{2}$/;
+  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const depTime = String(req.body.dep_time || "").trim();
+  const arrTime = String(req.body.arr_time || "").trim();
+  const stopRows = Array.isArray(req.body.stops) ? req.body.stops : [];
+  let stops_json = null;
+
+  if (stopRows.length) {
+    if (!hhmm.test(depTime)) return badRequest(res, "Stations dene ke liye 'Bus kab chalegi' time zaroori hai");
+    const depMin = toMin(depTime);
+    const rows = [];
+    for (const s of stopRows) {
+      const name = String(s.name || "").trim();
+      if (!name) continue;
+      const arr = String(s.arr || ""), dep = String(s.dep || "");
+      if (!hhmm.test(arr) || !hhmm.test(dep)) return badRequest(res, `Station ${name}: sahi time daalo (HH:MM)`);
+      const arrM = toMin(arr), depM = toMin(dep);
+      if (arrM <= depMin) return badRequest(res, `${name} ka arrival "bus chalegi" time ke BAAD hona chahiye`);
+      if (depM < arrM) return badRequest(res, `${name}: chalegi time aayegi se pehle nahi ho sakta`);
+      rows.push({ name, arrOffset: arrM - depMin, depOffset: depM - depMin });
+    }
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i].arrOffset < rows[i - 1].depOffset) return badRequest(res, "Stations ka time order galat hai — aage ke station ka time peeche wale se zyada hona chahiye");
+    }
+    if (rows.length) stops_json = JSON.stringify(rows);
+  }
+
   const route = await prisma.route.create({
-    data: { from_city_id: fromId, to_city_id: toId, distance_km: km, base_fare: fareFor("NON_AC_SEATER", km) },
+    data: { from_city_id: fromId, to_city_id: toId, distance_km: km, base_fare: baseFare, stops_json },
     include: { fromCity: true, toCity: true },
   }).catch(() => null);
   if (!route) return res.status(409).json({ error: "Route already exists" });
-  res.json({ ok: true, route });
+
+  // If departure time given, auto-schedule trips for the next 4 days
+  let tripsCreated = 0;
+  if (hhmm.test(depTime)) {
+    const buses = await prisma.bus.findMany({ take: 8 });
+    const drivers = await prisma.user.findMany({ where: { role: "DRIVER" }, take: 4 });
+    if (buses.length && drivers.length) {
+      const [H, M] = depTime.split(":").map(Number);
+      for (let d = 1; d <= 4; d++) {
+        const day = new Date(); day.setDate(day.getDate() + d); day.setHours(0, 0, 0, 0);
+        const dep = new Date(day); dep.setHours(H, M, 0, 0);
+        const bus = buses[d % buses.length];
+        let arr;
+        if (hhmm.test(arrTime)) {
+          const [ah, am] = arrTime.split(":").map(Number);
+          arr = new Date(day); arr.setHours(ah, am, 0, 0);
+          if (arr <= dep) arr = new Date(arr.getTime() + 86400000); // overnight arrival
+        } else {
+          arr = new Date(dep.getTime() + durationMinFor(bus.type, km) * 60000);
+        }
+        await prisma.trip.create({
+          data: {
+            route_id: route.id, bus_id: bus.id,
+            driver_id: drivers[d % drivers.length].id,
+            departure_time: dep, arrival_time: arr,
+            date: day, status: dep < new Date() ? "COMPLETED" : "SCHEDULED",
+            fare: customFare || fareFor(bus.type, km),
+          },
+        });
+        tripsCreated++;
+      }
+    }
+  }
+
+  res.json({ ok: true, route, tripsCreated });
 }));
 
 r.put("/routes/:id", wrap(async (req, res) => {
