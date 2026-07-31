@@ -16,6 +16,20 @@ export function genOtp() {
   return String(crypto.randomInt(100000, 999999));
 }
 
+// Password hashing using Node's built-in scrypt (format: "salt:hash")
+export function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password, stored) {
+  if (!stored) return false;
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const calc = crypto.scryptSync(String(password), salt, 64);
+  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), calc);
+}
+
 export function genPnr() {
   return "GBS-" + crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 6);
 }

@@ -5,7 +5,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   CITIES, CITY_COORDS, ROUTE_PAIRS, BUSES, BUS_TYPES, REVIEW_SNIPPETS,
 } from "../src/data/cities.js";
-import { seatLayoutFor, fareFor, durationMinFor, atTime, genPnr } from "../src/lib/util.js";
+import { seatLayoutFor, fareFor, durationMinFor, atTime, genPnr, hashPassword } from "../src/lib/util.js";
 
 const prisma = new PrismaClient();
 const DAY = 86400000;
@@ -26,6 +26,22 @@ const NAMES = ["Amit Patel", "Priya Shah", "Rahul Mehta", "Kinjal Desai", "Hardi
 
 async function main() {
   const force = process.argv.includes("--force");
+
+  // Ensure demo logins always have a password (also fixes DBs seeded before passwords existed)
+  const DEMO_PW = {
+    "9876543210": "demo123",
+    "9000000001": "admin123",
+    "9000000002": "driver123",
+    "9000000003": "driver123",
+    "9000000004": "driver123",
+  };
+  for (const [mobile, pw] of Object.entries(DEMO_PW)) {
+    const u = await prisma.user.findUnique({ where: { mobile } });
+    if (u && !u.password_hash) {
+      await prisma.user.update({ where: { mobile }, data: { password_hash: hashPassword(pw) } });
+    }
+  }
+
   const cityCount = await prisma.city.count();
   if (cityCount > 0 && !force) {
     console.log("ℹ️  Database already seeded — skipping (use `node prisma/seed.js --force` to reset).");
@@ -44,13 +60,13 @@ async function main() {
   });
 
   console.log("👥 Seeding users (admin / drivers / passengers)…");
-  await prisma.user.create({ data: { name: "GBS Admin", mobile: "9000000001", role: "ADMIN", email: "admin@gujaratbusseva.in" } });
+  await prisma.user.create({ data: { name: "GBS Admin", mobile: "9000000001", role: "ADMIN", email: "admin@gujaratbusseva.in", password_hash: hashPassword("admin123") } });
   const drivers = [];
   const DRIVER_NAMES = ["Mahesh Chauhan", "Baldev Rathod", "Suresh Damor"];
   for (let i = 0; i < 3; i++) {
-    drivers.push(await prisma.user.create({ data: { name: DRIVER_NAMES[i], mobile: `900000000${i + 2}`, role: "DRIVER" } }));
+    drivers.push(await prisma.user.create({ data: { name: DRIVER_NAMES[i], mobile: `900000000${i + 2}`, role: "DRIVER", password_hash: hashPassword("driver123") } }));
   }
-  await prisma.user.create({ data: { name: "Demo Passenger", mobile: "9876543210", role: "PASSENGER", email: "demo@gujaratbusseva.in" } });
+  await prisma.user.create({ data: { name: "Demo Passenger", mobile: "9876543210", role: "PASSENGER", email: "demo@gujaratbusseva.in", password_hash: hashPassword("demo123") } });
   const passengers = [];
   for (const name of NAMES) {
     passengers.push(await prisma.user.create({
@@ -196,7 +212,7 @@ async function main() {
   };
   console.log("✅ Seed complete:", counts);
   console.log("\n🔑 Demo logins (OTP is returned as devOtp in development):");
-  console.log("   Passenger: 9876543210 | Admin: 9000000001 | Driver: 9000000002\n");
+  console.log("   Passenger: 9876543210 / demo123 | Admin: 9000000001 / admin123 | Driver: 9000000002 / driver123\n");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
