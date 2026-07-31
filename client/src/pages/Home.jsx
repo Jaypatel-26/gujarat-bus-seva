@@ -64,11 +64,11 @@ export default function Home() {
       </section>
 
       {/* ---------- POPULAR ROUTES ---------- */}
-      <section className="mx-auto -mt-10 max-w-6xl px-4">
+      <section className="mx-auto mt-12 max-w-6xl px-4">
         <motion.div {...fadeUp} className="mb-4 flex items-end justify-between">
-          <div className="-mt-2 rounded-xl bg-gradient-to-r from-brand-700 to-transparent px-3 py-2">
-            <h2 className="font-display text-xl font-bold text-white drop-shadow">Popular Routes</h2>
-            <p className="text-sm text-brand-100">Gujarat's busiest corridors, updated daily</p>
+          <div>
+            <h2 className="font-display text-xl font-bold text-ink">Popular Routes</h2>
+            <p className="text-sm text-slate-500">Gujarat's busiest corridors, updated daily</p>
           </div>
         </motion.div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -33,13 +33,13 @@ export default function CitySelect({ label, value, onChange, excludeId, placehol
     <div className="relative" ref={boxRef}>
       {label && <label className="label">{label}</label>}
       <div className={`input flex cursor-text items-center gap-2 ${open ? "border-brand-500 ring-4 ring-brand-100" : ""}`}
-        onClick={() => { setOpen(true); }}>
+        onClick={() => { setOpen(true); if (!cities.length) loadCities().then(setCities); }}>
         <MapPin size={16} className={value ? "text-saffron-600" : "text-slate-400"} />
         <input
           className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
           placeholder={value ? value.name : placeholder}
           value={open ? q : value ? value.name : q}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { setOpen(true); if (!cities.length) loadCities().then(setCities); }}
           onChange={(e) => { setQ(e.target.value); setOpen(true); if (value) onChange(null); }}
         />
         {value && (
