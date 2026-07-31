@@ -112,7 +112,7 @@ export const REVIEW_SNIPPETS = [
   "Driver was courteous and the bus was comfortable.",
   "Reached Surat 15 minutes early. Highly recommended.",
   "Seats were comfortable, AC worked well throughout.",
-  "Live tracking feature is super useful for my parents.",
+  "Route vision feature bahut useful hai — har station ka time pehle se pata.",
   "Decent ride for the price. Boarding point was easy to find.",
   "Bus was slightly late but overall a good journey.",
   "Best option for Ahmedabad–Rajkot overnight travel.",

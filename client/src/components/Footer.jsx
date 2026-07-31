@@ -13,7 +13,7 @@ export default function Footer() {
               <span className="font-display text-lg font-bold text-brand-700">Gujarat Bus Seva</span>
             </div>
             <p className="mt-3 max-w-sm text-sm text-slate-500">
-              Book intercity bus tickets across every corner of Gujarat — with live GPS tracking,
+              Book intercity bus tickets across every corner of Gujarat — with station-wise 3D route vision,
               instant e-tickets and hassle-free cancellations.
             </p>
             <p className="mt-4 text-xs leading-relaxed text-slate-400">{CITIES_ROW}</p>

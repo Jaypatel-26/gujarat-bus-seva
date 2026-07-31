@@ -117,9 +117,7 @@ export default function Ticket() {
               <a className="btn-brand" href={`${API}/api/bookings/${b.pnr}/ticket.pdf?token=${token}`} target="_blank" rel="noreferrer">
                 <Download size={15} /> Download PDF
               </a>
-              {canTrack && (
-                <Link className="btn-primary" to={`/track/${t.id}`}><Radar size={15} /> Track Bus Live</Link>
-              )}
+              <Link className="btn-primary" to={`/trip/${t.id}/route`}><Radar size={15} /> Full Route & Timings</Link>
             </>
           )}
           <Link className="btn-ghost ml-auto" to="/bookings">My Bookings</Link>

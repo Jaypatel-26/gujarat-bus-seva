@@ -34,7 +34,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-4 pb-24 pt-14 md:pt-20">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <span className="chip border border-saffron-400/40 bg-saffron/15 text-saffron-100">
-              <LiveDot className="mr-0.5" /> GPS live tracking on every bus
+              <LiveDot className="mr-0.5" /> 3D Route Vision — station-wise timings on every bus
             </span>
             <h1 className="mt-4 max-w-2xl font-display text-3xl font-bold leading-tight text-white md:text-5xl">
               Gujarat ki har city,<br />
@@ -42,7 +42,7 @@ export default function Home() {
             </h1>
             <p className="mt-3 max-w-xl text-sm text-brand-100 md:text-base">
               Ahmedabad to Dwarka, Surat to Somnath — intercity buses across {cityCount} Gujarat cities
-              with live tracking, instant e-tickets and easy cancellations.
+              with station-wise route vision, instant e-tickets and easy cancellations.
             </p>
           </motion.div>
 
@@ -104,7 +104,7 @@ export default function Home() {
             [`${cityCount}+`, "Cities connected"],
             ["1,200+", "Trips every week"],
             ["4.6★", "Avg passenger rating"],
-            ["24×7", "Live GPS tracking"],
+            ["24×7", "Customer support"],
           ].map(([big, small]) => (
             <div key={small} className="px-4 py-6 text-center">
               <p className="font-display text-2xl font-bold md:text-3xl">{big}</p>
@@ -163,7 +163,7 @@ export default function Home() {
             <div className="relative hidden bg-gradient-to-br from-brand-600 to-brand-900 md:block">
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white">
                 <span className="animate-floaty text-6xl">🗺️</span>
-                <p className="max-w-[220px] text-center text-sm text-brand-100">Real-time location, powered by Socket.IO + OpenStreetMap</p>
+                <p className="max-w-[220px] text-center text-sm text-brand-100">3D Route Vision — har station, har time ka pura plan</p>
               </div>
             </div>
           </div>

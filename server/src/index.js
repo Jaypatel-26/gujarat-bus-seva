@@ -1,8 +1,6 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import http from "node:http";
-import { Server } from "socket.io";
 
 import authRoutes from "./routes/auth.js";
 import cityRoutes from "./routes/cities.js";
@@ -12,20 +10,15 @@ import paymentRoutes from "./routes/payments.js";
 import reviewRoutes from "./routes/reviews.js";
 import adminRoutes from "./routes/admin.js";
 import driverRoutes from "./routes/driver.js";
-import { initTracking } from "./lib/tracking.js";
 import { razorpayConfigured } from "./lib/razorpay.js";
 
 const app = express();
-const server = http.createServer(app);
 
 // Render injects bare hosts (no scheme); normalize so CORS origin matching works
 const toOrigin = (s) => (s && !/^https?:\/\//.test(s) ? `https://${s}` : s);
 const allowed = (process.env.CLIENT_URL || "http://localhost:5173").split(",").map(toOrigin);
 app.use(cors({ origin: (origin, cb) => cb(null, !origin || allowed.includes(origin) || process.env.NODE_ENV !== "production"), credentials: true }));
 app.use(express.json({ limit: "1mb" }));
-
-const io = new Server(server, { cors: { origin: "*" } });
-app.set("io", io);
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "Gujarat Bus Seva API", time: new Date().toISOString() }));
 app.get("/api/config", (_req, res) => res.json({
@@ -52,7 +45,6 @@ app.use((err, _req, res, _next) => {
 });
 
 const PORT = Number(process.env.PORT || 4000);
-server.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`🚌 Gujarat Bus Seva API running on http://localhost:${PORT}`);
-  await initTracking(io);
 });

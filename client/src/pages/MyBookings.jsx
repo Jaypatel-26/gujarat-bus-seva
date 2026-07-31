@@ -116,7 +116,7 @@ function BookingCard({ b, onCancel, onReview }) {
       <div className="flex flex-wrap gap-2">
         {b.status === "PENDING" && <Link className="btn-primary" to={`/checkout/${b.pnr}`}>Pay now</Link>}
         {b.status === "CONFIRMED" && <Link className="btn-ghost" to={`/ticket/${b.pnr}`}>View ticket</Link>}
-        {b.status === "CONFIRMED" && !departed && today && <Link className="btn-brand" to={`/track/${t.id}`}>🛰️ Track</Link>}
+        {b.status === "CONFIRMED" && <Link className="btn-brand" to={`/trip/${t.id}/route`}>🗺️ Route</Link>}
         {b.status !== "CANCELLED" && !departed && <button className="btn-danger" onClick={onCancel}>Cancel</button>}
         {b.status === "CONFIRMED" && departed && <button className="btn-ghost" onClick={onReview}>⭐ Rate trip</button>}
       </div>

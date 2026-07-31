@@ -18,7 +18,7 @@ export default function DriverHome() {
     setBusyId(trip.id);
     try {
       await api(`/driver/${trip.id}/${action}`, { method: "POST" });
-      if (action === "start") toast.ok("You're LIVE — location is broadcasting to passengers 📡");
+      if (action === "start") toast.ok("Trip started — safe journey! 🚌");
       else toast.info("Trip marked as completed. Great drive! 🏁");
       load();
     } catch (e) { toast.err(e.message); }
@@ -45,8 +45,8 @@ export default function DriverHome() {
       </div>
 
       <div className="mb-4 rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 text-xs leading-relaxed text-brand-700">
-        📱 In the production app, tapping <b>Start Trip</b> streams your phone's real GPS to passengers.
-        In this demo, a realistic route simulation is broadcast instead — passengers still see the bus moving live on their map.
+        📋 <b>Start Trip</b> dabate hi aapka trip "In progress" ho jata hai aur passengers ko
+        station-wise route & timings dikhti hain. Safar poora hone pe <b>Complete</b> dabao.
       </div>
 
       {!trips ? (
@@ -77,7 +77,7 @@ export default function DriverHome() {
                   )}
                   {t.status === "IN_PROGRESS" && (
                     <>
-                      <span className="chip animate-pulse bg-leaf-50 text-leaf-700">📡 Broadcasting GPS…</span>
+                      <span className="chip animate-pulse bg-leaf-50 text-leaf-700">🚌 Trip in progress…</span>
                       <button className="btn-brand" disabled={busyId === t.id} onClick={() => act(t, "complete")}>
                         {busyId === t.id ? "Finishing…" : "🏁 Complete Trip"}
                       </button>

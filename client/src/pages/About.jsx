@@ -11,7 +11,7 @@ const STATS = [
 ];
 
 const FEATURES = [
-  { icon: <Navigation size={22} />, title: "Live GPS Tracking", text: "Har bus ka live location — parivaar wale ghar baithe dekh sakte hain bus kaha pahunchi." },
+  { icon: <Navigation size={22} />, title: "3D Route Vision", text: "Har bus ka pura rasta 3D map pe — kaun se station pe kitne baje pahunchegi, sab pehle se pata." },
   { icon: <QrCode size={22} />, title: "Instant QR e-Tickets", text: "Booking karte hi QR ticket + PDF download. Print ki zaroorat nahi — phone dikhao, chadho." },
   { icon: <ShieldCheck size={22} />, title: "Safe & Verified", text: "Verified operators, trained conductors aur secure Razorpay payments — bina tension travel karo." },
   { icon: <HeartHandshake size={22} />, title: "Easy Cancellation", text: "Plan badla? 6 ghante pehle tak free cancellation, refund seedha aapke account me." },

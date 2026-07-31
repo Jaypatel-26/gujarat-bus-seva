@@ -108,7 +108,7 @@ export default function Seats() {
         </div>
         <div className="flex items-center gap-2">
           <Badge tone="blue">{busTypeLabel(trip.bus.type)}</Badge>
-          {trip.status === "IN_PROGRESS" && <Link to={`/track/${trip.id}`}><Badge tone="green">● Track live</Badge></Link>}
+          <Link to={`/trip/${trip.id}/route`}><Badge tone="slate">🗺️ Route & timings</Badge></Link>
         </div>
       </div>
 

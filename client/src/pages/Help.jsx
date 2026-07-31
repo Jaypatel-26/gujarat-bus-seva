@@ -12,7 +12,7 @@ const REFUND_ROWS = [
 
 const FAQS = [
   { q: "Bus ticket kaise book karu?", a: "Home page pe From-To cities aur date choose karo → Search Buses → apni bus select karo → seat chuno → passenger details bharo → payment karo. Turant QR e-ticket mil jayegi." },
-  { q: "Apni bus live kaise track karu?", a: "My Bookings me apni booking kholo aur 'Track Live' dabao. Family ko tracking link share kar sakte ho — login ke bina bhi dekh sakte hain." },
+  { q: "Apni bus ka pura route kaise dekhu?", a: "My Bookings me apni booking ke saamne '🗺️ Route' dabao. 3D Route Vision me pura rasta dikhta hai — kaun se station pe kitne baje bus aayegi aur kab chalegi, halt kitna hai — sab schedule ke saath." },
   { q: "Ticket cancel kaise karu?", a: "My Bookings → booking kholo → Cancel Booking. Refund rules neeche table me diye hain. Cancel karte hi refund process start ho jata hai." },
   { q: "Refund kitne din me aata hai?", a: "Refund 3-5 working days me aapke original payment method (UPI/card/bank) me aa jata hai. Demo mode me ye simulation hota hai, real payment nahi." },
   { q: "Payment fail ho gaya but paise kat gaye?", a: "Aisa hone pe amount 5-7 din me automatically bank se wapas aa jata hai. Booking confirm nahi hui to dobara try karo. Problem rahe to support pe contact karo." },

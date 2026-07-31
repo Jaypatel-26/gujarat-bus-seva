@@ -23,7 +23,7 @@ export default function Dashboard() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon="🎟️" label="Bookings today" value={stats.bookingsToday} sub={`${stats.tripsToday} trips scheduled today`} />
         <StatCard icon="💰" label="Revenue today" value={inr(stats.revenueToday)} sub="successful payments" accent="text-leaf-600" />
-        <StatCard icon="🚌" label="Buses live now" value={<span className="flex items-center gap-2">{stats.activeBuses} {stats.activeBuses > 0 && <LiveDot />}</span>} sub="streaming GPS / simulation" />
+        <StatCard icon="🚌" label="Trips in progress" value={<span className="flex items-center gap-2">{stats.activeBuses} {stats.activeBuses > 0 && <LiveDot />}</span>} sub="started by conductor" />
         <StatCard icon="👥" label="Registered users" value={stats.usersCount} sub="passengers + staff" />
       </div>
 

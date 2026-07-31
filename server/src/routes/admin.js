@@ -276,16 +276,5 @@ r.post("/trips", wrap(async (req, res) => {
 }));
 
 // ---------- Live fleet ----------
-r.get("/fleet", wrap(async (_req, res) => {
-  const trips = await prisma.trip.findMany({
-    where: { status: "IN_PROGRESS" },
-    include: {
-      route: { include: { fromCity: true, toCity: true } },
-      bus: true, driver: { select: { name: true } }, liveLocation: true,
-      _count: { select: { bookings: true } },
-    },
-  });
-  res.json({ fleet: trips });
-}));
 
 export default r;

@@ -2,7 +2,6 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { authRequired } from "../middleware/auth.js";
 import { wrap, notFound, badRequest } from "../lib/util.js";
-import { startSimulation, stopSimulation } from "../lib/tracking.js";
 
 const r = Router();
 r.use(authRequired("DRIVER", "ADMIN"));
@@ -59,7 +58,7 @@ r.get("/:id/manifest", wrap(async (req, res) => {
   res.json({ manifest: rows, total: rows.length });
 }));
 
-// POST /api/driver/:id/start — go live (GPS / simulated broadcast begins)
+// POST /api/driver/:id/start — mark trip in progress
 r.post("/:id/start", wrap(async (req, res) => {
   const trip = await ownTrip(req, res);
   if (!trip) return;
@@ -67,7 +66,6 @@ r.post("/:id/start", wrap(async (req, res) => {
   if (trip.status !== "IN_PROGRESS") {
     await prisma.trip.update({ where: { id: trip.id }, data: { status: "IN_PROGRESS" } });
   }
-  await startSimulation({ ...trip, status: "IN_PROGRESS" });
   res.json({ ok: true, status: "IN_PROGRESS" });
 }));
 
@@ -76,28 +74,7 @@ r.post("/:id/complete", wrap(async (req, res) => {
   const trip = await ownTrip(req, res);
   if (!trip) return;
   await prisma.trip.update({ where: { id: trip.id }, data: { status: "COMPLETED" } });
-  await stopSimulation(trip.id, "COMPLETED");
   res.json({ ok: true, status: "COMPLETED" });
-}));
-
-// POST /api/driver/:id/location { lat, lng, speed } — REAL GPS hook.
-// The driver app can POST device GPS here; it is broadcast to passengers.
-r.post("/:id/location", wrap(async (req, res) => {
-  const trip = await ownTrip(req, res);
-  if (!trip) return;
-  const lat = Number(req.body.lat), lng = Number(req.body.lng), speed = Number(req.body.speed) || 0;
-  if (!lat || !lng) return badRequest(res, "lat and lng required");
-  await prisma.liveLocation.upsert({
-    where: { trip_id: trip.id },
-    create: { trip_id: trip.id, latitude: lat, longitude: lng, speed },
-    update: { latitude: lat, longitude: lng, speed },
-  });
-  req.app.get("io")?.to(`trip:${trip.id}`).emit("location", {
-    tripId: trip.id, lat, lng, speed,
-    from: trip.route.fromCity.name, to: trip.route.toCity.name,
-    updatedAt: new Date().toISOString(),
-  });
-  res.json({ ok: true });
 }));
 
 export default r;

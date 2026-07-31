@@ -10,7 +10,7 @@ import Seats from "./pages/Seats";
 import Checkout from "./pages/Checkout";
 import Ticket from "./pages/Ticket";
 import MyBookings from "./pages/MyBookings";
-import Track from "./pages/Track";
+import RouteVision from "./pages/RouteVision";
 import Login from "./pages/Login";
 import About from "./pages/About";
 import Help from "./pages/Help";
@@ -50,7 +50,8 @@ export default function App() {
             <Route path="/checkout/:pnr" element={<Protected><Checkout /></Protected>} />
             <Route path="/ticket/:pnr" element={<Protected><Ticket /></Protected>} />
             <Route path="/bookings" element={<Protected><MyBookings /></Protected>} />
-            <Route path="/track/:tripId" element={<Track />} />
+            <Route path="/track/:tripId" element={<RouteVision />} />
+            <Route path="/trip/:id/route" element={<RouteVision />} />
             <Route path="/about" element={<About />} />
             <Route path="/help" element={<Help />} />
             <Route path="/login" element={<Login />} />
