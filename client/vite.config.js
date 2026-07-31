@@ -9,9 +9,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           react: ["react", "react-dom", "react-router-dom"],
-          maps: ["leaflet", "react-leaflet"],
           charts: ["recharts"],
-          realtime: ["socket.io-client"],
           motion: ["framer-motion"],
         },
       },
