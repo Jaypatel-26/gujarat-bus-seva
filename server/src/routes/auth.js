@@ -11,12 +11,14 @@ r.post("/otp/request", wrap(async (req, res) => {
   if (!/^[6-9]\d{9}$/.test(mobile)) return badRequest(res, "Enter a valid 10-digit Indian mobile number");
   const otp = genOtp();
   otpStore.set(mobile, { otp, expiresAt: Date.now() + OTP_TTL_MS });
-  // NOTE: plug Twilio/Firebase here for real SMS. Without creds we return a devOtp in non-production.
+  // NOTE: plug Twilio/Firebase here for real SMS. Until SMS creds exist, echo the OTP
+  // back as devOtp (even in production) so demo login works on the live site.
+  const smsConfigured = Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
   const existing = await prisma.user.findUnique({ where: { mobile } });
   res.json({
     ok: true,
     isNewUser: !existing,
-    devOtp: process.env.NODE_ENV === "production" ? undefined : otp,
+    devOtp: smsConfigured ? undefined : otp,
   });
 }));
 
