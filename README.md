@@ -86,10 +86,8 @@ Open **http://localhost:5173** 🎉
 
 1. Push this folder to a GitHub repo.
 2. Render Dashboard → **New → Blueprint** → pick the repo.
-   `render.yaml` creates everything: **PostgreSQL DB + API web service (runs migrations + seed automatically) + frontend static site.**
-3. After deploy, update two env vars with the actual URLs Render assigns:
-   - `CLIENT_URL` on `gbs-api` = your frontend URL (CORS)
-   - `VITE_API_URL` on `gujarat-bus-seva` = your API URL
+   `render.yaml` creates everything: **PostgreSQL DB + API web service (runs migrations + seed automatically) + frontend static site.** URLs auto-wire via `fromService` — no manual env setup needed.
+3. Wait for the first deploy (~5–8 min) and open your frontend URL 🎉
 4. Optional: add `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` (leave empty = demo payments).
 
 > 💡 Render free web services sleep after 15 min idle — for always-on live tracking in production, use a paid instance. WebSockets work on all plans.

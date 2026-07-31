@@ -18,7 +18,9 @@ import { razorpayConfigured } from "./lib/razorpay.js";
 const app = express();
 const server = http.createServer(app);
 
-const allowed = (process.env.CLIENT_URL || "http://localhost:5173").split(",");
+// Render injects bare hosts (no scheme); normalize so CORS origin matching works
+const toOrigin = (s) => (s && !/^https?:\/\//.test(s) ? `https://${s}` : s);
+const allowed = (process.env.CLIENT_URL || "http://localhost:5173").split(",").map(toOrigin);
 app.use(cors({ origin: (origin, cb) => cb(null, !origin || allowed.includes(origin) || process.env.NODE_ENV !== "production"), credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 

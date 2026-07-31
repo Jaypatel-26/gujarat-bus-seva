@@ -20,8 +20,12 @@ services:
         generateValue: true
       - key: NODE_ENV
         value: production
+      # Auto-filled: Render frontend ka actual host yahan inject hota hai (CORS ke liye)
       - key: CLIENT_URL
-        value: https://gujarat-bus-seva.onrender.com
+        fromService:
+          type: web
+          name: gujarat-bus-seva
+          property: host
       - key: SIM_SPEED
         value: "100"
       # Add real keys in the dashboard to switch off demo payment mode:
@@ -44,8 +48,12 @@ services:
         source: /*
         destination: /index.html
     envVars:
+      # Auto-filled: Render backend ka actual host yahan inject hota hai
       - key: VITE_API_URL
-        value: https://gbs-api.onrender.com
+        fromService:
+          type: web
+          name: gbs-api
+          property: host
 
 databases:
   - name: gbs-db

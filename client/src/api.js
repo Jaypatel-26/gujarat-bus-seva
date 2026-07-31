@@ -1,6 +1,8 @@
 import { useAuth } from "./store";
 
-export const API = import.meta.env.VITE_API_URL || "";
+// Render may inject a bare host (no scheme) — normalize it.
+const raw = import.meta.env.VITE_API_URL || "";
+export const API = raw && !/^https?:\/\//.test(raw) ? `https://${raw}` : raw;
 
 export async function api(path, { method = "GET", body } = {}) {
   const token = useAuth.getState().token;
