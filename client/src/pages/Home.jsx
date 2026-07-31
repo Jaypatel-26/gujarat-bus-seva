@@ -122,7 +122,7 @@ export default function Home() {
         </motion.p>
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: <Radar size={22} />, title: "Live Bus Tracking", text: "Watch your bus move on the map in real time, with ETA and next-stop updates.", tone: "text-brand-500 bg-brand-50" },
+            { icon: <Radar size={22} />, title: "3D Route Vision", text: "Har bus ka pura rasta 3D map pe — kaun se station pe kitne baje pahunchegi, sab pehle se pata.", tone: "text-brand-500 bg-brand-50" },
             { icon: <Ticket size={22} />, title: "QR E-Tickets", text: "Instant PDF ticket with a QR code — just show your phone while boarding.", tone: "text-saffron-600 bg-saffron-50" },
             { icon: <RefreshCcw size={22} />, title: "Easy Cancellations", text: "Plans change? Cancel in one tap and get your refund automatically.", tone: "text-leaf-600 bg-leaf-50" },
             { icon: <ShieldCheck size={22} />, title: "Safe & Secure", text: "Razorpay payments, verified operators and password-secured accounts.", tone: "text-danger-600 bg-danger-50" },
@@ -137,18 +137,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------- HOW TRACKING WORKS ---------- */}
+      {/* ---------- 3D ROUTE VISION ---------- */}
       <section className="mx-auto mt-14 max-w-6xl px-4">
         <motion.div {...fadeUp} className="card overflow-hidden">
           <div className="grid md:grid-cols-2">
             <div className="p-6 md:p-9">
-              <span className="chip bg-brand-50 text-brand-600">🛰️ LIVE TRACKING</span>
-              <h2 className="mt-3 font-display text-xl font-bold md:text-2xl">Track your bus like a cab</h2>
+              <span className="chip bg-brand-50 text-brand-600">🗺️ 3D ROUTE VISION</span>
+              <h2 className="mt-3 font-display text-xl font-bold md:text-2xl">Pura route pehle se dekho — har station, har time</h2>
               <ol className="mt-5 space-y-4">
                 {[
-                  ["Driver starts the trip", "GPS (or our simulation engine) begins streaming the bus location every few seconds."],
-                  ["You open “Track Bus”", "From My Bookings or your e-ticket — the map joins the live feed instantly."],
-                  ["Follow along in real time", "Moving bus marker, current speed, next stop and ETA — for you and your family."],
+                  ["Apni bus chuno", "Search results me har bus ke saath 🗺️ Route badge milta hai — seat book karne se pehle bhi dekh sakte ho."],
+                  ["Station-wise timetable kholo", "Kaun se station pe kitne baje bus aayegi aur kab chalegi — halt aur 🍽️ refreshment break ke saath."],
+                  ["3D route ribbon ka maza lo", "Tilted 3D map pe behti hui route line, floating station cards aur chalti hui bus — family ko bhi dikhao!"],
                 ].map(([t, d], i) => (
                   <li key={t} className="flex gap-3">
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-saffron font-display text-xs font-bold text-ink">{i + 1}</span>
@@ -160,11 +160,29 @@ export default function Home() {
                 ))}
               </ol>
             </div>
-            <div className="relative hidden bg-gradient-to-br from-brand-600 to-brand-900 md:block">
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white">
-                <span className="animate-floaty text-6xl">🗺️</span>
-                <p className="max-w-[220px] text-center text-sm text-brand-100">3D Route Vision — har station, har time ka pura plan</p>
+            <div className="relative hidden bg-gradient-to-br from-brand-600 to-brand-900 p-8 md:block">
+              <p className="text-center text-sm font-semibold text-brand-100">Ahmedabad → Surat ka asli sample 🚌</p>
+              <div className="mt-6 space-y-0">
+                {[
+                  { name: "Ahmedabad", time: "05:45 AM", note: "se chalegi", c: "#1E8E5A", end: true },
+                  { name: "Anand", time: "06:41 – 06:56 AM", note: "🍽️ 15m refreshment", c: "#38bdf8" },
+                  { name: "Bharuch", time: "08:53 – 08:58 AM", note: "5m halt", c: "#38bdf8" },
+                  { name: "Ankleshwar", time: "09:09 – 09:14 AM", note: "5m halt", c: "#38bdf8" },
+                  { name: "Surat", time: "10:14 AM", note: "pahunchegi 🏁", c: "#F4A100", end: true },
+                ].map((s, i, arr) => (
+                  <motion.div key={s.name} initial={{ opacity: 0, x: 16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.18 }} className="relative flex items-center gap-3 pl-1">
+                    <div className="flex w-5 flex-col items-center">
+                      <span className="z-10 block rounded-full border-2 border-white" style={{ background: s.c, width: s.end ? 14 : 10, height: s.end ? 14 : 10, margin: s.end ? 3 : 5 }} />
+                      {i < arr.length - 1 && <span className="h-8 w-0.5 bg-white/25" />}
+                    </div>
+                    <div className={`flex-1 rounded-xl bg-white/10 px-3 py-2 backdrop-blur ${i < arr.length - 1 ? "mb-1.5" : ""}`}>
+                      <p className="text-[13px] font-bold text-white">{s.name} <span className="ml-1 font-semibold text-brand-100">• {s.time}</span></p>
+                      <p className="text-[11px] text-brand-200">{s.note}</p>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
+              <p className="mt-5 text-center text-xs text-brand-200">Har bus ke liye aisa hi pura plan — time ke saath ✨</p>
             </div>
           </div>
         </motion.div>

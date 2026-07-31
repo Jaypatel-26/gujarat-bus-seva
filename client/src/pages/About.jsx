@@ -52,7 +52,8 @@ export default function About() {
           karna ho to dukaan ke chakkar. Humne socha — <b>kyun na poora system phone pe aa jaye?</b>
         </p>
         <p className="mt-3 text-sm leading-relaxed text-slate-600">
-          Aaj Gujarat Bus Seva pe aap seat choose kar sakte ho, live map pe bus track kar sakte ho,
+          Aaj Gujarat Bus Seva pe aap seat choose kar sakte ho, 3D Route Vision me bus ka pura rasta
+          dekh sakte ho (kaun se station pe kitne baje pahunchegi),
           QR e-ticket seedha phone pe pa sakte ho — aur zaroorat pade to ek tap me cancel bhi.
           Hamara maanna hai: <b className="text-brand-600">"Safar aasaan, booking aur bhi aasaan."</b>
         </p>

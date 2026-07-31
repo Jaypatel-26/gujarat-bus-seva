@@ -33,7 +33,7 @@ export default function TripCard({ trip, rating, onSelect, index = 0 }) {
           <Badge tone={trip.bus.type.includes("SLEEPER") ? "blue" : trip.bus.type.startsWith("AC") ? "green" : "slate"}>
             {busTypeLabel(trip.bus.type)}
           </Badge>
-          {trip.status === "IN_PROGRESS" && <Badge tone="green">● Live GPS</Badge>}
+          {trip.status === "IN_PROGRESS" && <Badge tone="green">● On the way</Badge>}
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
           <span>{trip.bus.number}</span>

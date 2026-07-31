@@ -34,8 +34,6 @@ export default function Ticket() {
     );
   }
 
-  const canTrack = new Date(t.date) >= new Date(new Date().toDateString()) && b.status === "CONFIRMED";
-
   return (
     <Page className="mx-auto max-w-3xl px-4 py-6">
       <motion.div
