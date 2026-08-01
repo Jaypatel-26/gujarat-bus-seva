@@ -9,6 +9,40 @@ r.use(authRequired("ADMIN"));
 
 const DAY = 86400000;
 
+// Stops ko stops_json me convert karta hai. Do formats chalte hain:
+//  a) { name, arr: "HH:MM", dep: "HH:MM" }   — depTime (HH:MM) ko base maan ke
+//  b) { name, arrOffset: <min>, depOffset: <min> } — seedha departure ke baad ke minutes
+function parseStops(stopRows, depTime) {
+  const hhmm = /^\d{1,2}:\d{2}$/;
+  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  if (!Array.isArray(stopRows) || !stopRows.length) return { rows: [] };
+  const depMin = hhmm.test(depTime) ? toMin(depTime) : null;
+  const rows = [];
+  for (const s of stopRows) {
+    const name = String(s?.name || "").trim();
+    if (!name) continue;
+    let arrOff, depOff;
+    if (s.arrOffset != null || s.depOffset != null) {
+      arrOff = Number(s.arrOffset); depOff = Number(s.depOffset);
+      if (!Number.isFinite(arrOff) || !Number.isFinite(depOff)) return { error: `Station ${name}: galat time` };
+      if (arrOff <= 0) return { error: `${name} ka arrival bus chalne ke BAAD hona chahiye` };
+      if (depOff < arrOff) return { error: `${name}: chalegi time aayegi se pehle nahi ho sakta` };
+    } else {
+      if (depMin == null) return { error: "Stations dene ke liye 'Bus kab chalegi' time zaroori hai" };
+      const arr = String(s.arr || ""), dep = String(s.dep || "");
+      if (!hhmm.test(arr) || !hhmm.test(dep)) return { error: `Station ${name}: sahi time daalo (HH:MM)` };
+      if (toMin(arr) <= depMin) return { error: `${name} ka arrival "bus chalegi" time ke BAAD hona chahiye` };
+      if (toMin(dep) < toMin(arr)) return { error: `${name}: chalegi time aayegi se pehle nahi ho sakta` };
+      arrOff = toMin(arr) - depMin; depOff = toMin(dep) - depMin;
+    }
+    rows.push({ name, arrOffset: Math.round(arrOff), depOffset: Math.round(depOff) });
+  }
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i].arrOffset < rows[i - 1].depOffset) return { error: "Stations ka time order galat hai — aage ke station ka time peeche wale se zyada hona chahiye" };
+  }
+  return { rows };
+}
+
 // ---------- Dashboard ----------
 r.get("/stats", wrap(async (_req, res) => {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -143,30 +177,14 @@ r.post("/routes", wrap(async (req, res) => {
 
   // Optional trip timing (HH:MM) + admin-defined stations with arrival/departure times
   const hhmm = /^\d{1,2}:\d{2}$/;
-  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const depTime = String(req.body.dep_time || "").trim();
   const arrTime = String(req.body.arr_time || "").trim();
-  const stopRows = Array.isArray(req.body.stops) ? req.body.stops : [];
   let stops_json = null;
 
-  if (stopRows.length) {
-    if (!hhmm.test(depTime)) return badRequest(res, "Stations dene ke liye 'Bus kab chalegi' time zaroori hai");
-    const depMin = toMin(depTime);
-    const rows = [];
-    for (const s of stopRows) {
-      const name = String(s.name || "").trim();
-      if (!name) continue;
-      const arr = String(s.arr || ""), dep = String(s.dep || "");
-      if (!hhmm.test(arr) || !hhmm.test(dep)) return badRequest(res, `Station ${name}: sahi time daalo (HH:MM)`);
-      const arrM = toMin(arr), depM = toMin(dep);
-      if (arrM <= depMin) return badRequest(res, `${name} ka arrival "bus chalegi" time ke BAAD hona chahiye`);
-      if (depM < arrM) return badRequest(res, `${name}: chalegi time aayegi se pehle nahi ho sakta`);
-      rows.push({ name, arrOffset: arrM - depMin, depOffset: depM - depMin });
-    }
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i].arrOffset < rows[i - 1].depOffset) return badRequest(res, "Stations ka time order galat hai — aage ke station ka time peeche wale se zyada hona chahiye");
-    }
-    if (rows.length) stops_json = JSON.stringify(rows);
+  if (Array.isArray(req.body.stops) && req.body.stops.length) {
+    const parsed = parseStops(req.body.stops, depTime);
+    if (parsed.error) return badRequest(res, parsed.error);
+    if (parsed.rows.length) stops_json = JSON.stringify(parsed.rows);
   }
 
   const route = await prisma.route.create({
@@ -238,7 +256,6 @@ r.put("/routes/:id", wrap(async (req, res) => {
   if (!route) return notFound(res, "Route not found");
 
   const hhmm = /^\d{1,2}:\d{2}$/;
-  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const depTime = String(req.body.dep_time || "").trim();
   const arrTime = String(req.body.arr_time || "").trim();
 
@@ -252,28 +269,15 @@ r.put("/routes/:id", wrap(async (req, res) => {
   const fareChanged = req.body.base_fare && Number(req.body.base_fare) !== route.base_fare;
   if (req.body.base_fare) data.base_fare = Number(req.body.base_fare);
 
-  // stations edit (empty array = clear back to auto)
+  // stations edit (empty array = clear back to auto). Offsets bhi chalte hain taaki
+  // Route Studio se EK station edit karne pe baaki trips ka time na badle.
   if (Array.isArray(req.body.stops)) {
     if (!req.body.stops.filter((s) => s && s.name).length) {
       data.stops_json = null;
     } else {
-      if (!hhmm.test(depTime)) return badRequest(res, "Stations dene ke liye 'Bus kab chalegi' time zaroori hai");
-      const depMin = toMin(depTime);
-      const rows = [];
-      for (const s of req.body.stops) {
-        const name = String(s.name || "").trim();
-        if (!name) continue;
-        const arr = String(s.arr || ""), dep = String(s.dep || "");
-        if (!hhmm.test(arr) || !hhmm.test(dep)) return badRequest(res, `Station ${name}: sahi time daalo (HH:MM)`);
-        const arrM = toMin(arr), depM = toMin(dep);
-        if (arrM <= depMin) return badRequest(res, `${name} ka arrival "bus chalegi" time ke BAAD hona chahiye`);
-        if (depM < arrM) return badRequest(res, `${name}: chalegi time aayegi se pehle nahi ho sakta`);
-        rows.push({ name, arrOffset: arrM - depMin, depOffset: depM - depMin });
-      }
-      for (let i = 1; i < rows.length; i++) {
-        if (rows[i].arrOffset < rows[i - 1].depOffset) return badRequest(res, "Stations ka time order galat hai");
-      }
-      data.stops_json = JSON.stringify(rows);
+      const parsed = parseStops(req.body.stops, depTime);
+      if (parsed.error) return badRequest(res, parsed.error);
+      data.stops_json = parsed.rows.length ? JSON.stringify(parsed.rows) : null;
     }
   }
 

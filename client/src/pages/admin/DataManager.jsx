@@ -3,6 +3,7 @@ import { api, loadCities, busTypeLabel } from "../../api";
 import { fmtTime, fmtDate, statusLabel, statusTone, todayStr, inr } from "../../lib/format";
 import { Badge, Modal, Skeleton } from "../../components/ui";
 import { toast } from "../../store";
+import RouteStudio from "./RouteStudio";
 
 const TABS = ["Routes", "Buses", "Drivers", "Trips"];
 
@@ -36,7 +37,8 @@ function RoutesTab() {
   const [cities, setCities] = useState([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null); // route id jab edit mode ho
-  const [detail, setDetail] = useState(null); // GET /admin/routes/:id ka data
+  const [studioId, setStudioId] = useState(null); // 3D Route Studio modal ke liye
+  const [origDep, setOrigDep] = useState(""); // edit me pehle ka time — tabhi retime ho jab admin badle
   const EMPTY = { from_city_id: "", to_city_id: "", distance_km: "", base_fare: "", dep_time: "", arr_time: "", stops: [] };
   const [form, setForm] = useState(EMPTY);
 
@@ -47,13 +49,7 @@ function RoutesTab() {
   const addStop = () => setForm({ ...form, stops: [...form.stops, { name: "", arr: "", dep: "" }] });
   const rmStop = (i) => setForm({ ...form, stops: form.stops.filter((_, j) => j !== i) });
 
-  const openDetail = async (id) => {
-    setDetail({ loading: true });
-    try { setDetail(await api(`/admin/routes/${id}`)); }
-    catch (e) { toast.err(e.message); setDetail(null); }
-  };
-
-  const openAdd = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
+  const openAdd = () => { setEditing(null); setOrigDep(""); setForm(EMPTY); setOpen(true); };
 
   const openEdit = async (r) => {
     try {
@@ -67,25 +63,36 @@ function RoutesTab() {
         stops = JSON.parse(r.stops_json).map((s) => ({ name: s.name, arr: toClock(base + s.arrOffset), dep: toClock(base + s.depOffset) }));
       }
       setEditing(r.id);
+      setOrigDep(dep_time);
       setForm({
         from_city_id: String(r.from_city_id), to_city_id: String(r.to_city_id),
         distance_km: String(r.distance_km), base_fare: String(r.base_fare),
         dep_time, arr_time, stops,
       });
-      setDetail(null);
+      setStudioId(null);
       setOpen(true);
     } catch (e) { toast.err(e.message); }
   };
 
   const save = async () => {
+    // Stations ko departure ke relative minutes me bhejo — isse sirf stations badalte hain,
+    // baaki trips ke apne-apne times waisa hi rehte hain (retime tabhi jab admin dep_time badle).
+    const depMin = form.dep_time ? toMin(form.dep_time) : null;
+    const stops = form.stops.filter((s) => s.name).map((s) => {
+      if (depMin == null || !s.arr || !s.dep) return { name: s.name, arr: s.arr, dep: s.dep };
+      let a = toMin(s.arr) - depMin, d = toMin(s.dep) - depMin;
+      if (a <= 0) a += 1440;
+      if (d < a) d += 1440;
+      return { name: s.name, arrOffset: a, depOffset: d };
+    });
     const body = {
       from_city_id: Number(form.from_city_id),
       to_city_id: Number(form.to_city_id),
       distance_km: form.distance_km ? Number(form.distance_km) : undefined,
       base_fare: form.base_fare ? Number(form.base_fare) : undefined,
-      dep_time: form.dep_time || undefined,
+      dep_time: editing ? (form.dep_time && form.dep_time !== origDep ? form.dep_time : undefined) : (form.dep_time || undefined),
       arr_time: form.arr_time || undefined,
-      stops: form.stops.filter((s) => s.name),
+      stops,
     };
     try {
       if (editing) {
@@ -106,17 +113,16 @@ function RoutesTab() {
 
   if (!routes) return <Skeleton className="h-72 w-full" />;
   const stopCityOptions = cities.filter((c) => String(c.id) !== String(form.from_city_id) && String(c.id) !== String(form.to_city_id));
-  const refTrip = detail?.trips?.find((t) => t.status === "SCHEDULED") || detail?.trips?.[0];
 
   return (
     <div className="card overflow-x-auto p-5">
       <Row title={`Routes (${routes.length})`} onAdd={openAdd} addLabel="+ Add route" />
-      <p className="mb-2 text-[11px] text-slate-400">💡 Kisi bhi route pe click karo — puri details dikhengi. Edit se sab kuch badal sakte ho.</p>
+      <p className="mb-2 text-[11px] text-slate-400">💡 Kisi bhi route pe click karo — <b>3D Route Studio</b> khulega: stations dikhenge aur har station edit bhi kar sakte ho.</p>
       <table className="w-full min-w-[560px]">
         <thead><tr><th className="th">From</th><th className="th">To</th><th className="th">Distance</th><th className="th">Base Fare</th><th className="th">Stations</th><th className="th">Trips</th><th className="th"></th></tr></thead>
         <tbody>
           {routes.map((r) => (
-            <tr key={r.id} className="cursor-pointer transition hover:bg-brand-50/60" onClick={() => openDetail(r.id)}>
+            <tr key={r.id} className="cursor-pointer transition hover:bg-brand-50/60" onClick={() => setStudioId(r.id)}>
               <td className="td font-medium">{r.fromCity.name}</td>
               <td className="td font-medium">{r.toCity.name}</td>
               <td className="td">{r.distance_km} km</td>
@@ -132,67 +138,11 @@ function RoutesTab() {
         </tbody>
       </table>
 
-      {/* ---------- ROUTE DETAIL MODAL ---------- */}
-      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.route ? `${detail.route.fromCity.name} → ${detail.route.toCity.name} — full details` : "Route details"} maxW="max-w-2xl">
-        {!detail || detail.loading ? (
-          <div className="space-y-2"><Skeleton className="h-6 w-1/2" /><Skeleton className="h-24 w-full" /><Skeleton className="h-32 w-full" /></div>
-        ) : (
-          <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
-            {/* info grid */}
-            <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
-              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Distance</p><p className="font-bold">{detail.route.distance_km} km</p></div>
-              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Base fare</p><p className="font-bold">{inr(detail.route.base_fare)}</p></div>
-              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Total trips</p><p className="font-bold">{detail.stats.totalTrips}</p></div>
-              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Bookings</p><p className="font-bold">{detail.stats.totalBookings}</p></div>
-            </div>
-
-            {/* stations */}
-            <div>
-              <p className="label">🚏 Stations (Route Vision me yehi dikhta hai)</p>
-              {detail.route.stops_json ? (
-                <div className="space-y-1.5">
-                  {JSON.parse(detail.route.stops_json).map((s, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm">
-                      <span className="font-semibold">{i + 1}. {s.name}</span>
-                      <span className="text-xs text-slate-500">
-                        {refTrip ? `${fmtTime(new Date(new Date(refTrip.departure_time).getTime() + s.arrOffset * 60000))} – ${fmtTime(new Date(new Date(refTrip.departure_time).getTime() + s.depOffset * 60000))}` : `+${s.arrOffset}m – +${s.depOffset}m`}
-                        <span className="ml-1 text-slate-400">({s.depOffset - s.arrOffset}m halt)</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">🤖 Auto mode — system apne aap route line ke paas ke cities ko stations bana deta hai.</p>
-              )}
-            </div>
-
-            {/* upcoming trips */}
-            <div>
-              <p className="label">🚌 Upcoming trips ({detail.trips.filter((t) => t.departure_time >= new Date().toISOString()).length})</p>
-              {detail.trips.length === 0 ? (
-                <p className="rounded-lg bg-mist px-3 py-3 text-xs text-slate-500">Is route pe koi trip nahi — Edit karke time do, ya Trips tab se add karo.</p>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-100">
-                  <table className="w-full min-w-[540px] text-sm">
-                    <thead><tr className="bg-mist/70 text-left"><th className="th">Date</th><th className="th">Time</th><th className="th">Bus</th><th className="th">Conductor</th><th className="th">Booked</th><th className="th">Status</th></tr></thead>
-                    <tbody>
-                      {detail.trips.map((t) => (
-                        <tr key={t.id} className="border-t border-slate-50">
-                          <td className="td">{fmtDate(t.date)}</td>
-                          <td className="td font-medium">{fmtTime(t.departure_time)} → {fmtTime(t.arrival_time)}</td>
-                          <td className="td text-xs">{t.bus.operator_name}<br /><span className="text-slate-400">{t.bus.bus_number} • {busTypeLabel(t.bus.type)}</span></td>
-                          <td className="td text-xs">{t.driver.name}<br /><span className="font-mono text-slate-400">{t.driver.conductor_id || "—"}</span></td>
-                          <td className="td">{t._count.bookings}</td>
-                          <td className="td"><Badge tone={statusTone(t.status)}>{statusLabel(t.status)}</Badge></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <button className="btn-primary w-full" onClick={() => openEdit(detail.route)}>✏️ Is route ko edit karo</button>
+      {/* ---------- 3D ROUTE STUDIO (click row → 3D stations + edit) ---------- */}
+      <Modal open={!!studioId} onClose={() => setStudioId(null)} title="🗺️ 3D Route Studio" maxW="max-w-6xl">
+        {studioId && (
+          <div className="max-h-[76vh] overflow-y-auto pr-1">
+            <RouteStudio rid={studioId} onFullEdit={openEdit} onChanged={load} />
           </div>
         )}
       </Modal>
