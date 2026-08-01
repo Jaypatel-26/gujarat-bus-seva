@@ -25,7 +25,7 @@ export default function Footer() {
               <li><Link className="hover:text-brand-600" to="/about">About Us</Link></li>
               <li><Link className="hover:text-brand-600" to="/bookings">My Bookings</Link></li>
               <li><Link className="hover:text-brand-600" to="/login">Login / Signup</Link></li>
-              <li><Link className="hover:text-brand-600" to="/driver">Driver Console</Link></li>
+              <li><Link className="hover:text-brand-600" to="/driver">Conductor Console</Link></li>
             </ul>
           </div>
           <div>

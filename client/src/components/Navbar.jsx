@@ -32,7 +32,7 @@ export default function Navbar() {
       <NavLink to="/" className={linkCls} end>Home</NavLink>
       <NavLink to="/bookings" className={linkCls}>My Bookings</NavLink>
       {user?.role === "ADMIN" && <NavLink to="/admin" className={linkCls}>Admin Panel</NavLink>}
-      {(user?.role === "DRIVER" || user?.role === "ADMIN") && <NavLink to="/driver" className={linkCls}>Driver</NavLink>}
+      {(user?.role === "DRIVER" || user?.role === "ADMIN") && <NavLink to="/driver" className={linkCls}>Conductor</NavLink>}
     </>
   );
 
@@ -74,7 +74,7 @@ export default function Navbar() {
                     </div>
                     <MenuLink to="/bookings" icon={<Ticket size={15} />} onClick={() => setMenuOpen(false)}>My Bookings</MenuLink>
                     {user.role === "ADMIN" && <MenuLink to="/admin" icon={<LayoutDashboard size={15} />} onClick={() => setMenuOpen(false)}>Admin Panel</MenuLink>}
-                    {(user.role === "DRIVER" || user.role === "ADMIN") && <MenuLink to="/driver" icon={<Radar size={15} />} onClick={() => setMenuOpen(false)}>Driver Console</MenuLink>}
+                    {(user.role === "DRIVER" || user.role === "ADMIN") && <MenuLink to="/driver" icon={<Radar size={15} />} onClick={() => setMenuOpen(false)}>Conductor Console</MenuLink>}
                     <button onClick={doLogout} className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-danger-600 transition hover:bg-danger-50">
                       <LogOut size={15} /> Logout
                     </button>

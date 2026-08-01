@@ -13,11 +13,28 @@ async function ownTrip(req, res) {
   });
   if (!trip) { notFound(res, "Trip not found"); return null; }
   if (req.user.role === "DRIVER" && trip.driver_id !== req.user.id) {
-    res.status(403).json({ error: "This trip is assigned to a different driver" });
+    res.status(403).json({ error: "Ye trip kisi aur conductor ko assigned hai" });
     return null;
   }
   return trip;
 }
+
+// GET /api/driver/me — conductor profile + stats (admin ko overall stats milte hain)
+r.get("/me", wrap(async (req, res) => {
+  const driverScope = req.user.role === "DRIVER" ? { driver_id: req.user.id } : {};
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [me, todayTrips, live, completed, total, conductors] = await Promise.all([
+    req.user.role === "DRIVER"
+      ? prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true, mobile: true, conductor_id: true, created_at: true } })
+      : Promise.resolve(null),
+    prisma.trip.count({ where: { ...driverScope, date: today } }),
+    prisma.trip.count({ where: { ...driverScope, status: "IN_PROGRESS" } }),
+    prisma.trip.count({ where: { ...driverScope, status: "COMPLETED" } }),
+    prisma.trip.count({ where: driverScope }),
+    prisma.user.count({ where: { role: "DRIVER" } }),
+  ]);
+  res.json({ conductor: me, stats: { todayTrips, live, completed, total, conductors } });
+}));
 
 // GET /api/driver/today — assigned trips for today + any already live
 r.get("/today", wrap(async (req, res) => {
