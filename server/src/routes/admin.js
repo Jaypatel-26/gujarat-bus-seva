@@ -364,7 +364,7 @@ r.get("/drivers", wrap(async (_req, res) => {
     include: { _count: { select: { drivenTrips: true } } },
     orderBy: { id: "asc" },
   });
-  res.json({ drivers: drivers.map((d) => ({ id: d.id, name: d.name, mobile: d.mobile, conductor_id: d.conductor_id, trips: d._count.drivenTrips })) });
+  res.json({ drivers: drivers.map((d) => ({ id: d.id, name: d.name, mobile: d.mobile, conductor_id: d.conductor_id, password: d.password_plain, trips: d._count.drivenTrips })) });
 }));
 
 r.post("/drivers", wrap(async (req, res) => {
@@ -382,9 +382,41 @@ r.post("/drivers", wrap(async (req, res) => {
     return res.status(409).json({ error: "Mobile already registered" });
   }
   const driver = await prisma.user.create({
-    data: { name, mobile, conductor_id: conductorId, role: "DRIVER", password_hash: hashPassword(password) },
+    data: { name, mobile, conductor_id: conductorId, role: "DRIVER", password_hash: hashPassword(password), password_plain: password },
   });
   res.json({ ok: true, driver: { id: driver.id, name: driver.name, mobile: driver.mobile, conductor_id: driver.conductor_id } });
+}));
+
+// PUT /api/admin/drivers/:id — conductor edit (jo field bhejo wahi badlega; password blank = wahi purana)
+r.put("/drivers/:id", wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  const u = await prisma.user.findUnique({ where: { id } });
+  if (!u || u.role !== "DRIVER") return notFound(res, "Conductor not found");
+  const data = {};
+  if (req.body.name != null && String(req.body.name).trim()) data.name = String(req.body.name).trim();
+  if (req.body.mobile != null && String(req.body.mobile).trim()) {
+    const mobile = String(req.body.mobile).replace(/\D/g, "").slice(-10);
+    if (!/^[6-9]\d{9}$/.test(mobile)) return badRequest(res, "Valid 10-digit mobile do");
+    const clash = await prisma.user.findFirst({ where: { mobile, id: { not: id } } });
+    if (clash) return res.status(409).json({ error: "Ye mobile kisi aur user ka hai" });
+    data.mobile = mobile;
+  }
+  if (req.body.conductorId != null && String(req.body.conductorId).trim()) {
+    const cid = String(req.body.conductorId).trim().toUpperCase();
+    if (!/^GJ\d{4,}$/.test(cid)) return badRequest(res, "Conductor ID must look like GJ015503");
+    const clash = await prisma.user.findFirst({ where: { conductor_id: cid, id: { not: id } } });
+    if (clash) return res.status(409).json({ error: "Ye Conductor ID kisi aur conductor ka hai" });
+    data.conductor_id = cid;
+  }
+  if (req.body.password != null && String(req.body.password) !== "") {
+    const pw = String(req.body.password);
+    if (pw.length < 6) return badRequest(res, "Password must be at least 6 characters");
+    data.password_hash = hashPassword(pw);
+    data.password_plain = pw;
+  }
+  if (!Object.keys(data).length) return badRequest(res, "Kuch change nahi mila");
+  await prisma.user.update({ where: { id }, data });
+  res.json({ ok: true });
 }));
 
 r.delete("/drivers/:id", wrap(async (req, res) => {

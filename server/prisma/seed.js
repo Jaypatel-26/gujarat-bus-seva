@@ -45,6 +45,7 @@ async function main() {
           email: acc.email ?? u.email,
           conductor_id: acc.conductorId ?? u.conductor_id,
           password_hash: hashPassword(acc.password),
+          ...(acc.conductorId ? { password_plain: acc.password } : {}), // admin ko conductors ka password dikhana hai
         },
       });
     }
@@ -76,7 +77,7 @@ async function main() {
   const drivers = [];
   const DRIVER_NAMES = ["Mahesh Chauhan", "Baldev Rathod", "Suresh Damor"];
   for (let i = 0; i < 3; i++) {
-    drivers.push(await prisma.user.create({ data: { name: DRIVER_NAMES[i], mobile: `900000000${i + 2}`, role: "DRIVER", conductor_id: `GJ01550${i}`, password_hash: hashPassword("conductor123") } }));
+    drivers.push(await prisma.user.create({ data: { name: DRIVER_NAMES[i], mobile: `900000000${i + 2}`, role: "DRIVER", conductor_id: `GJ01550${i}`, password_hash: hashPassword("conductor123"), password_plain: "conductor123" } }));
   }
   await prisma.user.create({ data: { name: "Demo Passenger", mobile: "9876543210", role: "PASSENGER", email: "demo@gujaratbusseva.in", password_hash: hashPassword("demo123") } });
   const passengers = [];

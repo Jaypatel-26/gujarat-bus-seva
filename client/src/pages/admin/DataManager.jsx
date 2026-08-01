@@ -4,6 +4,7 @@ import { fmtTime, fmtDate, statusLabel, statusTone, todayStr, inr } from "../../
 import { Badge, Modal, Skeleton } from "../../components/ui";
 import { toast } from "../../store";
 import RouteStudio from "./RouteStudio";
+import ConductorsPanel from "./ConductorsPanel";
 
 const TABS = ["Routes", "Buses", "Conductors", "Trips"];
 
@@ -271,51 +272,7 @@ function BusesTab() {
 
 /* ---------------- Conductors ---------------- */
 function DriversTab() {
-  const [drivers, setDrivers] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", mobile: "", conductorId: "", password: "" });
-
-  const load = () => api("/admin/drivers").then((d) => setDrivers(d.drivers));
-  useEffect(() => { load(); }, []);
-
-  const add = async () => {
-    try { await api("/admin/drivers", { method: "POST", body: form }); toast.ok(`Conductor added — login: ${form.conductorId.toUpperCase()} / ${form.password}`); setOpen(false); setForm({ name: "", mobile: "", conductorId: "", password: "" }); load(); }
-    catch (e) { toast.err(e.message); }
-  };
-  const del = async (id) => {
-    try { await api(`/admin/drivers/${id}`, { method: "DELETE" }); toast.ok("Conductor removed"); load(); }
-    catch (e) { toast.err(e.message); }
-  };
-
-  if (!drivers) return <Skeleton className="h-60 w-full" />;
-  return (
-    <div className="card overflow-x-auto p-5">
-      <Row title={`Conductors (${drivers.length})`} onAdd={() => setOpen(true)} addLabel="+ Add conductor" />
-      <table className="w-full min-w-[480px]">
-        <thead><tr><th className="th">Name</th><th className="th">Conductor ID</th><th className="th">Mobile</th><th className="th">Trips assigned</th><th className="th"></th></tr></thead>
-        <tbody>
-          {drivers.map((d) => (
-            <tr key={d.id} className="hover:bg-mist/60">
-              <td className="td font-medium">{d.name}</td>
-              <td className="td font-mono text-xs font-semibold text-brand-700">{d.conductor_id || "—"}</td>
-              <td className="td font-mono text-xs">{d.mobile}</td>
-              <td className="td">{d.trips}</td>
-              <td className="td text-right"><button className="text-xs font-semibold text-danger-600 hover:underline" onClick={() => del(d.id)}>Remove</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <Modal open={open} onClose={() => setOpen(false)} title="Add conductor">
-        <div className="space-y-3">
-          <div><label className="label">Full name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div><label className="label">Mobile</label><input className="input" maxLength={10} value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, "") })} /></div>
-          <div><label className="label">Conductor ID (login isi se hoga)</label><input className="input font-mono" placeholder="GJ015503" value={form.conductorId} onChange={(e) => setForm({ ...form, conductorId: e.target.value.toUpperCase() })} /></div>
-          <div><label className="label">Password</label><input className="input" type="text" placeholder="min 6 characters" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
-          <button className="btn-primary w-full" onClick={add} disabled={!form.name || form.mobile.length !== 10 || !/^GJ\d{3,}$/.test(form.conductorId.toUpperCase()) || form.password.length < 6}>Save conductor</button>
-        </div>
-      </Modal>
-    </div>
-  );
+  return <ConductorsPanel />;
 }
 
 /* ---------------- Trips ---------------- */

@@ -3,6 +3,7 @@ import { api, busTypeLabel } from "../api";
 import { fmtTime, statusLabel, statusTone } from "../lib/format";
 import { Page, Badge, EmptyState, Skeleton, LiveDot, Modal } from "../components/ui";
 import { toast, useAuth } from "../store";
+import ConductorsPanel from "./admin/ConductorsPanel";
 
 export default function DriverHome() {
   const { user } = useAuth();
@@ -55,7 +56,7 @@ export default function DriverHome() {
           </div>
           <span className="text-3xl">🚍</span>
         </div>
-        <ConductorManager />
+        <ConductorsPanel />
       </Page>
     );
   }
@@ -177,81 +178,5 @@ export default function DriverHome() {
         )}
       </Modal>
     </Page>
-  );
-}
-
-/* ---------- Manage conductors — admin view ka main content ---------- */
-function ConductorManager() {
-  const [rows, setRows] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", mobile: "", conductorId: "", password: "" });
-  const [busy, setBusy] = useState(false);
-
-  const load = () => api("/admin/drivers").then((d) => setRows(d.drivers)).catch((e) => toast.err(e.message));
-  useEffect(() => { load(); }, []);
-
-  const add = async () => {
-    setBusy(true);
-    try {
-      await api("/admin/drivers", { method: "POST", body: form });
-      toast.ok(`Conductor added ✅ — login: ${form.conductorId.toUpperCase()} / ${form.password}`);
-      setOpen(false);
-      setForm({ name: "", mobile: "", conductorId: "", password: "" });
-      load();
-    } catch (e) { toast.err(e.message); }
-    finally { setBusy(false); }
-  };
-
-  const del = async (id) => {
-    try { await api(`/admin/drivers/${id}`, { method: "DELETE" }); toast.ok("Conductor removed"); load(); }
-    catch (e) { toast.err(e.message); }
-  };
-
-  return (
-    <div className="card p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <h2 className="font-display text-[15px] font-semibold">🎫 Manage Conductors {rows ? <span className="text-xs text-slate-400">({rows.length})</span> : null}</h2>
-          <p className="text-xs text-slate-500">Conductor ki puri detail — yahi se add/remove karo</p>
-        </div>
-        <button className="btn-brand py-1.5 text-xs" onClick={() => setOpen(true)}>+ Add conductor</button>
-      </div>
-
-      {!rows ? (
-        <Skeleton className="h-28 w-full" />
-      ) : rows.length === 0 ? (
-        <p className="rounded-lg bg-mist px-3 py-3 text-center text-xs text-slate-500">Koi conductor nahi — "+ Add conductor" se add karo.</p>
-      ) : (
-        <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-slate-100">
-          <table className="w-full min-w-[480px]">
-            <thead className="sticky top-0 bg-mist/90"><tr className="text-left"><th className="th">Name</th><th className="th">Conductor ID</th><th className="th">Mobile</th><th className="th">Trips</th><th className="th"></th></tr></thead>
-            <tbody>
-              {rows.map((d) => (
-                <tr key={d.id} className="border-t border-slate-50 hover:bg-mist/60">
-                  <td className="td font-medium">{d.name}</td>
-                  <td className="td font-mono text-xs font-semibold text-brand-700">{d.conductor_id || "—"}</td>
-                  <td className="td font-mono text-xs">{d.mobile}</td>
-                  <td className="td">{d.trips}</td>
-                  <td className="td text-right"><button className="text-xs font-semibold text-danger-600 hover:underline" onClick={() => del(d.id)}>Remove</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <Modal open={open} onClose={() => setOpen(false)} title="Add conductor">
-        <div className="space-y-3">
-          <div><label className="label">Full name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div><label className="label">Mobile</label><input className="input" maxLength={10} value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, "") })} /></div>
-          <div><label className="label">Conductor ID (login isi se hoga)</label><input className="input font-mono" placeholder="GJ015503" value={form.conductorId} onChange={(e) => setForm({ ...form, conductorId: e.target.value.toUpperCase() })} /></div>
-          <div><label className="label">Password</label><input className="input" type="text" placeholder="min 6 characters" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
-          <p className="rounded-lg bg-mist p-2 text-xs text-slate-500">Conductor login page pe 🎫 role chun ke apni <b>Conductor ID + password</b> se login karega.</p>
-          <button className="btn-primary w-full" disabled={busy || !form.name || form.mobile.length !== 10 || !/^GJ\d{3,}$/.test(form.conductorId.toUpperCase()) || form.password.length < 6} onClick={add}>
-            {busy ? "Saving…" : "Save conductor"}
-          </button>
-        </div>
-      </Modal>
-    </div>
   );
 }

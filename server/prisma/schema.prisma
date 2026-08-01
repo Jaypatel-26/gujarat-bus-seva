@@ -18,6 +18,7 @@ model User {
   email         String?
   conductor_id  String?
   password_hash String?
+  password_plain String? // sirf admin ko conductors ka password dikhane ke liye (demo app)
   role          String    @default("PASSENGER") // PASSENGER | ADMIN | DRIVER
   created_at    DateTime  @default(now())
   bookings      Booking[]
