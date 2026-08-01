@@ -211,14 +211,106 @@ r.post("/routes", wrap(async (req, res) => {
   res.json({ ok: true, route, tripsCreated });
 }));
 
-r.put("/routes/:id", wrap(async (req, res) => {
-  const km = Number(req.body.distance_km);
-  if (!km) return badRequest(res, "distance_km required");
-  const route = await prisma.route.update({
+// GET /api/admin/routes/:id — route ki FULL details (stations + upcoming trips + stats)
+r.get("/routes/:id", wrap(async (req, res) => {
+  const route = await prisma.route.findUnique({
     where: { id: Number(req.params.id) },
-    data: { distance_km: km, base_fare: fareFor("NON_AC_SEATER", km) },
+    include: { fromCity: true, toCity: true },
   });
-  res.json({ ok: true, route });
+  if (!route) return notFound(res, "Route not found");
+  const trips = await prisma.trip.findMany({
+    where: { route_id: route.id, departure_time: { gte: new Date(Date.now() - 86400000) } },
+    include: { bus: true, driver: { select: { name: true, conductor_id: true } }, _count: { select: { bookings: true } } },
+    orderBy: [{ date: "asc" }, { departure_time: "asc" }],
+    take: 40,
+  });
+  const stats = {
+    totalTrips: await prisma.trip.count({ where: { route_id: route.id } }),
+    totalBookings: await prisma.booking.count({ where: { status: "CONFIRMED", trip: { route_id: route.id } } }),
+  };
+  res.json({ route, trips, stats });
+}));
+
+// PUT /api/admin/routes/:id — sab kuch edit: cities, distance, fare, times, stations
+r.put("/routes/:id", wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  const route = await prisma.route.findUnique({ where: { id } });
+  if (!route) return notFound(res, "Route not found");
+
+  const hhmm = /^\d{1,2}:\d{2}$/;
+  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const depTime = String(req.body.dep_time || "").trim();
+  const arrTime = String(req.body.arr_time || "").trim();
+
+  const data = {};
+  const fromId = Number(req.body.from_city_id) || route.from_city_id;
+  const toId = Number(req.body.to_city_id) || route.to_city_id;
+  if (fromId === toId) return badRequest(res, "From aur To same nahi ho sakte");
+  data.from_city_id = fromId;
+  data.to_city_id = toId;
+  if (req.body.distance_km) data.distance_km = Number(req.body.distance_km);
+  const fareChanged = req.body.base_fare && Number(req.body.base_fare) !== route.base_fare;
+  if (req.body.base_fare) data.base_fare = Number(req.body.base_fare);
+
+  // stations edit (empty array = clear back to auto)
+  if (Array.isArray(req.body.stops)) {
+    if (!req.body.stops.filter((s) => s && s.name).length) {
+      data.stops_json = null;
+    } else {
+      if (!hhmm.test(depTime)) return badRequest(res, "Stations dene ke liye 'Bus kab chalegi' time zaroori hai");
+      const depMin = toMin(depTime);
+      const rows = [];
+      for (const s of req.body.stops) {
+        const name = String(s.name || "").trim();
+        if (!name) continue;
+        const arr = String(s.arr || ""), dep = String(s.dep || "");
+        if (!hhmm.test(arr) || !hhmm.test(dep)) return badRequest(res, `Station ${name}: sahi time daalo (HH:MM)`);
+        const arrM = toMin(arr), depM = toMin(dep);
+        if (arrM <= depMin) return badRequest(res, `${name} ka arrival "bus chalegi" time ke BAAD hona chahiye`);
+        if (depM < arrM) return badRequest(res, `${name}: chalegi time aayegi se pehle nahi ho sakta`);
+        rows.push({ name, arrOffset: arrM - depMin, depOffset: depM - depMin });
+      }
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i].arrOffset < rows[i - 1].depOffset) return badRequest(res, "Stations ka time order galat hai");
+      }
+      data.stops_json = JSON.stringify(rows);
+    }
+  }
+
+  const updated = await prisma.route.update({ where: { id }, data, include: { fromCity: true, toCity: true } }).catch(() => null);
+  if (!updated) return res.status(409).json({ error: "Ye from→to route pehle se exist karta hai" });
+
+  // Future SCHEDULED trips pe naye time / fare apply karo
+  let tripsUpdated = 0;
+  if (hhmm.test(depTime) || fareChanged) {
+    const future = await prisma.trip.findMany({
+      where: { route_id: id, status: "SCHEDULED", departure_time: { gte: new Date() } },
+      include: { bus: true },
+    });
+    for (const tr of future) {
+      const upd = {};
+      if (fareChanged) upd.fare = data.base_fare;
+      if (hhmm.test(depTime)) {
+        const [H, M] = depTime.split(":").map(Number);
+        const dep = new Date(tr.date); dep.setHours(H, M, 0, 0);
+        let arr;
+        if (hhmm.test(arrTime)) {
+          const [ah, am] = arrTime.split(":").map(Number);
+          arr = new Date(tr.date); arr.setHours(ah, am, 0, 0);
+          if (arr <= dep) arr = new Date(arr.getTime() + 86400000);
+        } else {
+          const dur = Math.max(30 * 60000, new Date(tr.arrival_time) - new Date(tr.departure_time));
+          arr = new Date(dep.getTime() + dur);
+        }
+        upd.departure_time = dep;
+        upd.arrival_time = arr;
+      }
+      await prisma.trip.update({ where: { id: tr.id }, data: upd });
+      tripsUpdated++;
+    }
+  }
+
+  res.json({ ok: true, route: updated, tripsUpdated });
 }));
 
 r.delete("/routes/:id", wrap(async (req, res) => {

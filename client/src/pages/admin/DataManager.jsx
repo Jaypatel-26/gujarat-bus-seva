@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, loadCities, busTypeLabel } from "../../api";
-import { fmtTime, statusLabel, statusTone, todayStr, inr } from "../../lib/format";
+import { fmtTime, fmtDate, statusLabel, statusTone, todayStr, inr } from "../../lib/format";
 import { Badge, Modal, Skeleton } from "../../components/ui";
 import { toast } from "../../store";
 
@@ -27,10 +27,16 @@ export default function DataManager() {
 }
 
 /* ---------------- Routes ---------------- */
+const toHHMM = (d) => { const x = new Date(d); return `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
+const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+const toClock = (mins) => `${String(Math.floor(mins / 60) % 24).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+
 function RoutesTab() {
   const [routes, setRoutes] = useState(null);
   const [cities, setCities] = useState([]);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // route id jab edit mode ho
+  const [detail, setDetail] = useState(null); // GET /admin/routes/:id ka data
   const EMPTY = { from_city_id: "", to_city_id: "", distance_km: "", base_fare: "", dep_time: "", arr_time: "", stops: [] };
   const [form, setForm] = useState(EMPTY);
 
@@ -41,22 +47,55 @@ function RoutesTab() {
   const addStop = () => setForm({ ...form, stops: [...form.stops, { name: "", arr: "", dep: "" }] });
   const rmStop = (i) => setForm({ ...form, stops: form.stops.filter((_, j) => j !== i) });
 
-  const add = async () => {
+  const openDetail = async (id) => {
+    setDetail({ loading: true });
+    try { setDetail(await api(`/admin/routes/${id}`)); }
+    catch (e) { toast.err(e.message); setDetail(null); }
+  };
+
+  const openAdd = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
+
+  const openEdit = async (r) => {
     try {
-      const d = await api("/admin/routes", {
-        method: "POST",
-        body: {
-          from_city_id: Number(form.from_city_id),
-          to_city_id: Number(form.to_city_id),
-          distance_km: form.distance_km ? Number(form.distance_km) : undefined,
-          base_fare: form.base_fare ? Number(form.base_fare) : undefined,
-          dep_time: form.dep_time || undefined,
-          arr_time: form.arr_time || undefined,
-          stops: form.stops.filter((s) => s.name),
-        },
+      const d = await api(`/admin/routes/${r.id}`);
+      const firstTrip = d.trips.find((t) => t.status === "SCHEDULED") || d.trips[0];
+      const dep_time = firstTrip ? toHHMM(firstTrip.departure_time) : "";
+      const arr_time = firstTrip ? toHHMM(firstTrip.arrival_time) : "";
+      let stops = [];
+      if (r.stops_json && dep_time) {
+        const base = toMin(dep_time);
+        stops = JSON.parse(r.stops_json).map((s) => ({ name: s.name, arr: toClock(base + s.arrOffset), dep: toClock(base + s.depOffset) }));
+      }
+      setEditing(r.id);
+      setForm({
+        from_city_id: String(r.from_city_id), to_city_id: String(r.to_city_id),
+        distance_km: String(r.distance_km), base_fare: String(r.base_fare),
+        dep_time, arr_time, stops,
       });
-      toast.ok(`Route added${d.tripsCreated ? ` + ${d.tripsCreated} trips schedule ho gaye` : ""} ✅`);
-      setOpen(false); setForm(EMPTY); load();
+      setDetail(null);
+      setOpen(true);
+    } catch (e) { toast.err(e.message); }
+  };
+
+  const save = async () => {
+    const body = {
+      from_city_id: Number(form.from_city_id),
+      to_city_id: Number(form.to_city_id),
+      distance_km: form.distance_km ? Number(form.distance_km) : undefined,
+      base_fare: form.base_fare ? Number(form.base_fare) : undefined,
+      dep_time: form.dep_time || undefined,
+      arr_time: form.arr_time || undefined,
+      stops: form.stops.filter((s) => s.name),
+    };
+    try {
+      if (editing) {
+        const d = await api(`/admin/routes/${editing}`, { method: "PUT", body });
+        toast.ok(`Route updated ✅${d.tripsUpdated ? ` — ${d.tripsUpdated} trips pe apply hua` : ""}`);
+      } else {
+        const d = await api("/admin/routes", { method: "POST", body });
+        toast.ok(`Route added${d.tripsCreated ? ` + ${d.tripsCreated} trips schedule ho gaye` : ""} ✅`);
+      }
+      setOpen(false); setEditing(null); setForm(EMPTY); load();
     } catch (e) { toast.err(e.message); }
   };
 
@@ -67,27 +106,99 @@ function RoutesTab() {
 
   if (!routes) return <Skeleton className="h-72 w-full" />;
   const stopCityOptions = cities.filter((c) => String(c.id) !== String(form.from_city_id) && String(c.id) !== String(form.to_city_id));
+  const refTrip = detail?.trips?.find((t) => t.status === "SCHEDULED") || detail?.trips?.[0];
 
   return (
     <div className="card overflow-x-auto p-5">
-      <Row title={`Routes (${routes.length})`} onAdd={() => setOpen(true)} addLabel="+ Add route" />
+      <Row title={`Routes (${routes.length})`} onAdd={openAdd} addLabel="+ Add route" />
+      <p className="mb-2 text-[11px] text-slate-400">💡 Kisi bhi route pe click karo — puri details dikhengi. Edit se sab kuch badal sakte ho.</p>
       <table className="w-full min-w-[560px]">
         <thead><tr><th className="th">From</th><th className="th">To</th><th className="th">Distance</th><th className="th">Base Fare</th><th className="th">Stations</th><th className="th">Trips</th><th className="th"></th></tr></thead>
         <tbody>
           {routes.map((r) => (
-            <tr key={r.id} className="hover:bg-mist/60">
+            <tr key={r.id} className="cursor-pointer transition hover:bg-brand-50/60" onClick={() => openDetail(r.id)}>
               <td className="td font-medium">{r.fromCity.name}</td>
               <td className="td font-medium">{r.toCity.name}</td>
               <td className="td">{r.distance_km} km</td>
               <td className="td">{inr(r.base_fare)}</td>
-              <td className="td">{r.stops_json ? JSON.parse(r.stops_json).length : "auto"}</td>
+              <td className="td">{r.stops_json ? `${JSON.parse(r.stops_json).length} 🚏` : "auto"}</td>
               <td className="td">{r._count.trips}</td>
-              <td className="td text-right"><button className="text-xs font-semibold text-danger-600 hover:underline" onClick={() => del(r.id)}>Delete</button></td>
+              <td className="td text-right">
+                <button className="mr-3 text-xs font-semibold text-brand-600 hover:underline" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>✏️ Edit</button>
+                <button className="text-xs font-semibold text-danger-600 hover:underline" onClick={(e) => { e.stopPropagation(); del(r.id); }}>Delete</button>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <Modal open={open} onClose={() => setOpen(false)} title="Add route" maxW="max-w-lg">
+
+      {/* ---------- ROUTE DETAIL MODAL ---------- */}
+      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.route ? `${detail.route.fromCity.name} → ${detail.route.toCity.name} — full details` : "Route details"} maxW="max-w-2xl">
+        {!detail || detail.loading ? (
+          <div className="space-y-2"><Skeleton className="h-6 w-1/2" /><Skeleton className="h-24 w-full" /><Skeleton className="h-32 w-full" /></div>
+        ) : (
+          <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+            {/* info grid */}
+            <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
+              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Distance</p><p className="font-bold">{detail.route.distance_km} km</p></div>
+              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Base fare</p><p className="font-bold">{inr(detail.route.base_fare)}</p></div>
+              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Total trips</p><p className="font-bold">{detail.stats.totalTrips}</p></div>
+              <div className="rounded-xl bg-mist p-3"><p className="label !mb-1">Bookings</p><p className="font-bold">{detail.stats.totalBookings}</p></div>
+            </div>
+
+            {/* stations */}
+            <div>
+              <p className="label">🚏 Stations (Route Vision me yehi dikhta hai)</p>
+              {detail.route.stops_json ? (
+                <div className="space-y-1.5">
+                  {JSON.parse(detail.route.stops_json).map((s, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm">
+                      <span className="font-semibold">{i + 1}. {s.name}</span>
+                      <span className="text-xs text-slate-500">
+                        {refTrip ? `${fmtTime(new Date(new Date(refTrip.departure_time).getTime() + s.arrOffset * 60000))} – ${fmtTime(new Date(new Date(refTrip.departure_time).getTime() + s.depOffset * 60000))}` : `+${s.arrOffset}m – +${s.depOffset}m`}
+                        <span className="ml-1 text-slate-400">({s.depOffset - s.arrOffset}m halt)</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">🤖 Auto mode — system apne aap route line ke paas ke cities ko stations bana deta hai.</p>
+              )}
+            </div>
+
+            {/* upcoming trips */}
+            <div>
+              <p className="label">🚌 Upcoming trips ({detail.trips.filter((t) => t.departure_time >= new Date().toISOString()).length})</p>
+              {detail.trips.length === 0 ? (
+                <p className="rounded-lg bg-mist px-3 py-3 text-xs text-slate-500">Is route pe koi trip nahi — Edit karke time do, ya Trips tab se add karo.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-100">
+                  <table className="w-full min-w-[540px] text-sm">
+                    <thead><tr className="bg-mist/70 text-left"><th className="th">Date</th><th className="th">Time</th><th className="th">Bus</th><th className="th">Conductor</th><th className="th">Booked</th><th className="th">Status</th></tr></thead>
+                    <tbody>
+                      {detail.trips.map((t) => (
+                        <tr key={t.id} className="border-t border-slate-50">
+                          <td className="td">{fmtDate(t.date)}</td>
+                          <td className="td font-medium">{fmtTime(t.departure_time)} → {fmtTime(t.arrival_time)}</td>
+                          <td className="td text-xs">{t.bus.operator_name}<br /><span className="text-slate-400">{t.bus.bus_number} • {busTypeLabel(t.bus.type)}</span></td>
+                          <td className="td text-xs">{t.driver.name}<br /><span className="font-mono text-slate-400">{t.driver.conductor_id || "—"}</span></td>
+                          <td className="td">{t._count.bookings}</td>
+                          <td className="td"><Badge tone={statusTone(t.status)}>{statusLabel(t.status)}</Badge></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <button className="btn-primary w-full" onClick={() => openEdit(detail.route)}>✏️ Is route ko edit karo</button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ---------- ADD / EDIT MODAL ---------- */}
+      <Modal open={open} onClose={() => { setOpen(false); setEditing(null); }} title={editing ? "Edit route — sab kuch badal sakte ho" : "Add route"} maxW="max-w-lg">
         <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
           <div className="grid grid-cols-2 gap-3">
             <div><label className="label">From city</label>
@@ -114,7 +225,9 @@ function RoutesTab() {
               <div><label className="label">Bus pahunchegi (arrival)</label>
                 <input className="input" type="time" value={form.arr_time} onChange={(e) => setForm({ ...form, arr_time: e.target.value })} placeholder="auto" /></div>
             </div>
-            <p className="mt-1.5 text-[11px] text-slate-500">Time doge to agle 4 din ke trips apne aap schedule ho jayenge. Arrival blank = auto-estimate.</p>
+            <p className="mt-1.5 text-[11px] text-slate-500">
+              {editing ? "Time badloge to aane wale SCHEDULED trips pe naya time apply ho jayega." : "Time doge to agle 4 din ke trips apne aap schedule ho jayenge."} Arrival blank = auto-estimate.
+            </p>
           </div>
 
           <div className="rounded-xl border border-saffron-200 bg-saffron-50/60 p-3">
@@ -122,7 +235,7 @@ function RoutesTab() {
               <p className="label !mb-0 text-saffron-700">🚏 Beech ke stations (time ke saath)</p>
               <button type="button" className="chip border border-saffron-300 bg-white text-saffron-700 hover:bg-saffron-100" onClick={addStop}>+ Add station</button>
             </div>
-            {form.stops.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Station add nahi karoge to system apne aap route line ke paas wale cities choose karega.</p>}
+            {form.stops.length === 0 && <p className="mt-2 text-[11px] text-slate-500">Station add nahi karoge to system apne aap route line ke paas wale cities choose karega.{editing ? " (Khali rakha = auto pe wapas)" : ""}</p>}
             {form.stops.length > 0 && !form.dep_time && <p className="mt-2 text-[11px] font-semibold text-danger-600">⚠️ Stations ke liye upar "Bus chalegi" time bhi do</p>}
             {form.stops.map((s, i) => (
               <div key={i} className="mt-2 flex items-end gap-2">
@@ -142,7 +255,9 @@ function RoutesTab() {
             ))}
           </div>
 
-          <button className="btn-primary w-full" onClick={add} disabled={!form.from_city_id || !form.to_city_id}>Save route</button>
+          <button className="btn-primary w-full" onClick={save} disabled={!form.from_city_id || !form.to_city_id}>
+            {editing ? "Save changes" : "Save route"}
+          </button>
         </div>
       </Modal>
     </div>
