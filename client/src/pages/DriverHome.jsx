@@ -12,13 +12,16 @@ export default function DriverHome() {
   const [manifestTrip, setManifestTrip] = useState(null);
   const [manifest, setManifest] = useState(null);
 
+  const isAdmin = user?.role === "ADMIN";
+
   const load = () => api("/driver/today").then((d) => setTrips(d.trips)).catch((e) => toast.err(e.message));
   useEffect(() => {
+    if (isAdmin) return; // admin ko sirf Manage Conductors dikhana hai — trips load nahi
     load();
     api("/driver/me").then(setMe).catch(() => {});
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
-  }, []);
+  }, [isAdmin]);
 
   const act = async (trip, action) => {
     setBusyId(trip.id);
@@ -41,7 +44,23 @@ export default function DriverHome() {
     } catch (e) { toast.err(e.message); setManifestTrip(null); }
   };
 
-  const isAdmin = user?.role === "ADMIN";
+  /* ============ ADMIN VIEW — sirf Manage Conductors ============ */
+  if (isAdmin) {
+    return (
+      <Page className="mx-auto max-w-3xl px-4 py-6">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-xl font-bold md:text-2xl">Conductor Console</h1>
+            <p className="text-sm text-slate-500">Saare conductors yaha manage karo 🎫</p>
+          </div>
+          <span className="text-3xl">🚍</span>
+        </div>
+        <ConductorManager />
+      </Page>
+    );
+  }
+
+  /* ============ CONDUCTOR VIEW — apna profile + trips ============ */
   const c = me?.conductor;
 
   return (
@@ -49,7 +68,7 @@ export default function DriverHome() {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="font-display text-xl font-bold md:text-2xl">Conductor Console</h1>
-          <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Conductor"} 🙏 — aaj ka schedule aur conductor ki puri jaankari</p>
+          <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Conductor"} 🙏 — aaj ka schedule</p>
         </div>
         <span className="text-3xl">🚍</span>
       </div>
@@ -67,7 +86,7 @@ export default function DriverHome() {
               <div className="flex-1">
                 <p className="font-display text-lg font-bold leading-tight">{c?.name || user?.name}</p>
                 <p className="text-xs text-brand-100">
-                  {isAdmin && !c ? "🛠️ Admin mode — sab conductors ke trips dikh rahe hain" : `🎫 Conductor${c?.since ? ` • ${new Date(c.since).toLocaleDateString("en-IN", { month: "short", year: "numeric" })} se juda` : ""}`}
+                  🎫 Conductor{c?.since ? ` • ${new Date(c.since).toLocaleDateString("en-IN", { month: "short", year: "numeric" })} se juda` : ""}
                 </p>
               </div>
               {(c?.conductor_id || user?.conductor_id) && (
@@ -83,9 +102,6 @@ export default function DriverHome() {
           </div>
         </div>
       )}
-
-      {/* ---- Manage conductors (sirf admin) ---- */}
-      {isAdmin && <ConductorManager />}
 
       <div className="mb-4 mt-2 rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 text-xs leading-relaxed text-brand-700">
         📋 <b>Start Trip</b> dabate hi trip "In progress" ho jata hai aur passengers ko
@@ -164,7 +180,7 @@ export default function DriverHome() {
   );
 }
 
-/* ---------- Manage conductors — admin ke liye, wahi console ke andar ---------- */
+/* ---------- Manage conductors — admin view ka main content ---------- */
 function ConductorManager() {
   const [rows, setRows] = useState(null);
   const [open, setOpen] = useState(false);
@@ -192,7 +208,7 @@ function ConductorManager() {
   };
 
   return (
-    <div className="card mb-4 p-4">
+    <div className="card p-4">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h2 className="font-display text-[15px] font-semibold">🎫 Manage Conductors {rows ? <span className="text-xs text-slate-400">({rows.length})</span> : null}</h2>
@@ -206,7 +222,7 @@ function ConductorManager() {
       ) : rows.length === 0 ? (
         <p className="rounded-lg bg-mist px-3 py-3 text-center text-xs text-slate-500">Koi conductor nahi — "+ Add conductor" se add karo.</p>
       ) : (
-        <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-100">
+        <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-slate-100">
           <table className="w-full min-w-[480px]">
             <thead className="sticky top-0 bg-mist/90"><tr className="text-left"><th className="th">Name</th><th className="th">Conductor ID</th><th className="th">Mobile</th><th className="th">Trips</th><th className="th"></th></tr></thead>
             <tbody>
