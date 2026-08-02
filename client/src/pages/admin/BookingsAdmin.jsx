@@ -50,7 +50,23 @@ export default function BookingsAdmin() {
               {rows.map((b) => (
                 <tr key={b.pnr} className="hover:bg-mist/60">
                   <td className="td font-mono text-xs font-semibold">{b.pnr}</td>
-                  <td className="td"><span className="block font-medium">{b.user}</span><span className="text-[11px] text-slate-400">{b.mobile}</span></td>
+                  <td className="td">
+                    {b.passengers?.length ? (
+                      <span title={b.passengers.map((p) => `${p.name} (${p.age}/${p.gender})`).join(", ")}>
+                        <span className="block font-medium">
+                          {b.passengers[0].name}
+                          {b.passengers.length > 1 && <span className="ml-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-600">+{b.passengers.length - 1}</span>}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {b.passengers[0].age}/{b.passengers[0].gender}
+                          {b.user && b.passengers[0].name !== b.user ? ` • booked by ${b.user}` : ""}
+                          {b.mobile ? ` • ${b.mobile}` : ""}
+                        </span>
+                      </span>
+                    ) : (
+                      <span><span className="block font-medium">{b.user}</span><span className="text-[11px] text-slate-400">{b.mobile}</span></span>
+                    )}
+                  </td>
                   <td className="td">{b.route}</td>
                   <td className="td text-xs">{fmtDate(b.date)}</td>
                   <td className="td text-xs">{b.seats}</td>

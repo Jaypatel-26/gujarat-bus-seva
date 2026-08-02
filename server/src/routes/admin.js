@@ -109,12 +109,14 @@ async function bookingsQuery(req) {
       { pnr: { contains: q } },
       { user: { name: { contains: q } } },
       { user: { mobile: { contains: q } } },
+      { passengers: { some: { name: { contains: q } } } }, // seat time likha hua passenger ka naam se bhi
     ];
   }
   return prisma.booking.findMany({
     where,
     include: {
       user: { select: { name: true, mobile: true } },
+      passengers: true, // booking ke waqt likhe gaye asli passengers
       trip: { include: { route: { include: { fromCity: true, toCity: true } }, bus: true } },
       seats: { include: { seat: true } },
       payment: true,
@@ -130,6 +132,7 @@ r.get("/bookings", wrap(async (req, res) => {
     bookings: rows.map((b) => ({
       pnr: b.pnr, status: b.status, total: b.total_fare, bookedAt: b.created_at,
       user: b.user?.name || "—", mobile: b.user?.mobile || "",
+      passengers: b.passengers.map((p) => ({ name: p.name, age: p.age, gender: p.gender })), // seat time ka asli passenger
       route: `${b.trip.route.fromCity.name} → ${b.trip.route.toCity.name}`,
       date: b.trip.date, bus: b.trip.bus.bus_number,
       seats: b.seats.map((s) => s.seat.seat_number).join(", "),
@@ -141,10 +144,10 @@ r.get("/bookings", wrap(async (req, res) => {
 r.get("/bookings.csv", wrap(async (req, res) => {
   const rows = await bookingsQuery(req);
   const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines = [["PNR", "Passenger", "Mobile", "Route", "Journey Date", "Bus", "Seats", "Fare", "Status", "Payment", "Booked At"].join(",")];
+  const lines = [["PNR", "Passengers", "Booked By", "Mobile", "Route", "Journey Date", "Bus", "Seats", "Fare", "Status", "Payment", "Booked At"].join(",")];
   for (const b of rows) {
     lines.push([
-      b.pnr, esc(b.user?.name), b.user?.mobile,
+      b.pnr, esc(b.passengers.map((p) => p.name).join("; ")), esc(b.user?.name), b.user?.mobile,
       esc(`${b.trip.route.fromCity.name} -> ${b.trip.route.toCity.name}`),
       b.trip.date.toISOString().slice(0, 10), b.trip.bus.bus_number,
       esc(b.seats.map((s) => s.seat.seat_number).join(" ")),
