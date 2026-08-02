@@ -469,6 +469,61 @@ r.post("/trips", wrap(async (req, res) => {
   res.json({ ok: true, trip });
 }));
 
+// ---------- Route ↔ Conductor assignment ----------
+// GET /api/admin/assignments — har route pe aaj ke baad ke trips me kaun-kaun conductor hai
+r.get("/assignments", wrap(async (_req, res) => {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [routes, trips, drivers] = await Promise.all([
+    prisma.route.findMany({ include: { fromCity: true, toCity: true }, orderBy: { id: "asc" } }),
+    prisma.trip.findMany({ where: { date: { gte: today }, status: { not: "CANCELLED" } }, select: { route_id: true, driver_id: true } }),
+    prisma.user.findMany({ where: { role: "DRIVER" }, select: { id: true, name: true, conductor_id: true }, orderBy: { id: "asc" } }),
+  ]);
+  const driverMap = new Map(drivers.map((d) => [d.id, d]));
+  const byRoute = new Map(); // route_id -> { conductors:Map(driverId->count), trips:0 }
+  for (const t of trips) {
+    if (!byRoute.has(t.route_id)) byRoute.set(t.route_id, { conductors: new Map(), trips: 0 });
+    const g = byRoute.get(t.route_id);
+    g.trips++;
+    if (t.driver_id) g.conductors.set(t.driver_id, (g.conductors.get(t.driver_id) || 0) + 1);
+  }
+  res.json({
+    routes: routes.map((r2) => {
+      const g = byRoute.get(r2.id);
+      const conductors = g
+        ? [...g.conductors.entries()]
+            .map(([id, count]) => ({ ...driverMap.get(id), trips: count }))
+            .filter((c) => c.id)
+            .sort((a, b) => b.trips - a.trips)
+        : [];
+      return {
+        id: r2.id, distance_km: r2.distance_km,
+        from: r2.fromCity.name, to: r2.toCity.name,
+        trips: g?.trips || 0, conductors,
+      };
+    }),
+    drivers,
+  });
+}));
+
+// PUT /api/admin/assignments/:routeId — is route ke aane wale SCHEDULED trips ek conductor ko de do
+r.put("/assignments/:routeId", wrap(async (req, res) => {
+  const routeId = Number(req.params.routeId);
+  const driverId = Number(req.body.driverId);
+  if (!routeId || !driverId) return badRequest(res, "routeId aur driverId dono zaroori hain");
+  const [route, driver] = await Promise.all([
+    prisma.route.findUnique({ where: { id: routeId }, include: { fromCity: true, toCity: true } }),
+    prisma.user.findFirst({ where: { id: driverId, role: "DRIVER" } }),
+  ]);
+  if (!route) return notFound(res, "Route not found");
+  if (!driver) return badRequest(res, "Conductor not found");
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const upd = await prisma.trip.updateMany({
+    where: { route_id: routeId, date: { gte: today }, status: "SCHEDULED" },
+    data: { driver_id: driverId },
+  });
+  res.json({ ok: true, tripsUpdated: upd.count, conductor: { id: driver.id, name: driver.name, conductor_id: driver.conductor_id } });
+}));
+
 // ---------- Live fleet ----------
 
 export default r;

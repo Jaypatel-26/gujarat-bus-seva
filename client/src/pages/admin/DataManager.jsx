@@ -6,7 +6,7 @@ import { toast } from "../../store";
 import RouteStudio from "./RouteStudio";
 import ConductorsPanel from "./ConductorsPanel";
 
-const TABS = ["Routes", "Buses", "Conductors", "Trips"];
+const TABS = ["Routes", "Buses", "Conductors", "Trips", "Assignments"];
 
 export default function DataManager() {
   const [tab, setTab] = useState("Routes");
@@ -24,6 +24,7 @@ export default function DataManager() {
       {tab === "Buses" && <BusesTab />}
       {tab === "Conductors" && <DriversTab />}
       {tab === "Trips" && <TripsTab />}
+      {tab === "Assignments" && <AssignmentsTab />}
     </div>
   );
 }
@@ -273,6 +274,96 @@ function BusesTab() {
 /* ---------------- Conductors ---------------- */
 function DriversTab() {
   return <ConductorsPanel />;
+}
+
+/* ---------------- Assignments (route ↔ conductor) ---------------- */
+function AssignmentsTab() {
+  const [data, setData] = useState(null);
+  const [q, setQ] = useState("");
+  const [editRoute, setEditRoute] = useState(null);
+  const [driverId, setDriverId] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = () => api("/admin/assignments").then(setData).catch((e) => toast.err(e.message));
+  useEffect(() => { load(); }, []);
+
+  const openEdit = (r) => { setEditRoute(r); setDriverId(String(r.conductors[0]?.id || "")); };
+  const save = async () => {
+    if (!driverId || busy) return;
+    setBusy(true);
+    try {
+      const d = await api(`/admin/assignments/${editRoute.id}`, { method: "PUT", body: { driverId: Number(driverId) } });
+      toast.ok(`✅ ${d.tripsUpdated} trips ab ${d.conductor.name} (${d.conductor.conductor_id}) ke hain`);
+      setEditRoute(null);
+      load();
+    } catch (e) { toast.err(e.message); }
+    finally { setBusy(false); }
+  };
+
+  if (!data) return <Skeleton className="h-80 w-full" />;
+  const s2 = q.trim().toLowerCase();
+  const rows = data.routes.filter((r) => !s2 || `${r.from} ${r.to}`.toLowerCase().includes(s2));
+
+  return (
+    <div className="card overflow-x-auto p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-[15px] font-semibold">Route-wise conductor duty ({rows.length})</h3>
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+          <input className="input !py-1.5 !pl-9 text-xs w-60" placeholder="Route dhundo (city ka naam)…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+      </div>
+      <p className="mb-2 text-[11px] text-slate-400">💡 Har route pe aaj ke baad ke trips kaun chala raha hai — ✏️ Edit se kisi bhi route ka conductor badal sakte ho (us route ke saare aane wale SCHEDULED trips us conductor ko mil jayenge).</p>
+      <table className="w-full min-w-[640px]">
+        <thead><tr><th className="th">Route</th><th className="th">Conductor(s)</th><th className="th">Trips</th><th className="th"></th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="transition hover:bg-mist/60">
+              <td className="td font-medium">{r.from} → {r.to}<span className="ml-1 text-[10px] text-slate-400">{r.distance_km} km</span></td>
+              <td className="td">
+                {r.conductors.length === 0 ? (
+                  <span className="text-xs text-slate-400">—</span>
+                ) : (
+                  <div className="flex max-w-[340px] flex-wrap gap-1">
+                    {r.conductors.slice(0, 3).map((c) => (
+                      <span key={c.id} className="chip bg-brand-50 text-brand-700 !text-[11px]" title={`${c.name} • ${c.trips} trips`}>
+                        {c.name} <b className="font-mono">{c.conductor_id}</b>{c.trips > 1 ? ` ×${c.trips}` : ""}
+                      </span>
+                    ))}
+                    {r.conductors.length > 3 && <span className="chip bg-mist text-slate-500 !text-[11px]">+{r.conductors.length - 3} aur</span>}
+                  </div>
+                )}
+              </td>
+              <td className="td">{r.trips}</td>
+              <td className="td text-right">
+                <button className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => openEdit(r)} disabled={r.trips === 0}>✏️ Edit</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <Modal open={!!editRoute} onClose={() => setEditRoute(null)} title="Conductor badlo">
+        {editRoute && (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-mist p-3">
+              <p className="font-display text-[15px] font-bold">{editRoute.from} → {editRoute.to}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{editRoute.trips} upcoming trips • abhi: {editRoute.conductors.length ? editRoute.conductors.map((c) => `${c.name} (${c.conductor_id})`).join(", ") : "koi nahi"}</p>
+            </div>
+            <div>
+              <label className="label">Naya conductor (saare upcoming SCHEDULED trips usko)</label>
+              <select className="input" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+                <option value="">Select…</option>
+                {data.drivers.map((d) => <option key={d.id} value={d.id}>{d.name} — {d.conductor_id}</option>)}
+              </select>
+            </div>
+            <p className="rounded-lg bg-saffron-50 p-2 text-xs text-saffron-700">⚠️ Save karte hi is route ke saare aane wale trips selected conductor ko chale jayenge.</p>
+            <button className="btn-primary w-full" disabled={!driverId || busy} onClick={save}>{busy ? "Saving…" : "Save assignment"}</button>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
 }
 
 /* ---------------- Trips ---------------- */
