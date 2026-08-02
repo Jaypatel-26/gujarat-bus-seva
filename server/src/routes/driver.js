@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import { authRequired } from "../middleware/auth.js";
-import { wrap, notFound, badRequest } from "../lib/util.js";
+import { wrap, notFound, badRequest, hashPassword } from "../lib/util.js";
 import { streamManifestPdf } from "../lib/ticket.js";
 
 const r = Router();
@@ -26,7 +26,7 @@ r.get("/me", wrap(async (req, res) => {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const [me, todayTrips, live, completed, total, conductors] = await Promise.all([
     req.user.role === "DRIVER"
-      ? prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true, mobile: true, conductor_id: true, created_at: true } })
+      ? prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true, mobile: true, conductor_id: true, photo_url: true, created_at: true } })
       : Promise.resolve(null),
     prisma.trip.count({ where: { ...driverScope, date: today } }),
     prisma.trip.count({ where: { ...driverScope, status: "IN_PROGRESS" } }),
@@ -35,6 +35,43 @@ r.get("/me", wrap(async (req, res) => {
     prisma.user.count({ where: { role: "DRIVER" } }),
   ]);
   res.json({ conductor: me, stats: { todayTrips, live, completed, total, conductors } });
+}));
+
+// PUT /api/driver/me — apna profile edit (Conductor ID locked 🔒 — wo kabhi nahi badlegi)
+r.put("/me", wrap(async (req, res) => {
+  if (req.user.role !== "DRIVER") return res.status(403).json({ error: "Sirf conductor apna profile edit kar sakta hai" });
+  const id = req.user.id;
+  const data = {};
+  if (req.body.name != null && String(req.body.name).trim()) {
+    const name = String(req.body.name).trim();
+    if (name.length < 3) return badRequest(res, "Naam kam se kam 3 letters ka ho");
+    data.name = name;
+  }
+  if (req.body.mobile != null && String(req.body.mobile).trim()) {
+    const mobile = String(req.body.mobile).replace(/\D/g, "").slice(-10);
+    if (!/^[6-9]\d{9}$/.test(mobile)) return badRequest(res, "Sahi 10-digit mobile daalo");
+    const clash = await prisma.user.findFirst({ where: { mobile, id: { not: id } } });
+    if (clash) return res.status(409).json({ error: "Ye mobile kisi aur account me hai" });
+    data.mobile = mobile;
+  }
+  if (req.body.password != null && String(req.body.password) !== "") {
+    const pw = String(req.body.password);
+    if (pw.length < 6) return badRequest(res, "Password kam se kam 6 characters ka ho");
+    data.password_hash = hashPassword(pw);
+    data.password_plain = pw; // admin ko dikhta rahe
+  }
+  if (req.body.photo === null) {
+    data.photo_url = null; // photo hata diya
+  } else if (typeof req.body.photo === "string" && req.body.photo.startsWith("data:image/")) {
+    if (req.body.photo.length > 500000) return badRequest(res, "Photo bahut bada hai — chhota image chuno");
+    data.photo_url = req.body.photo;
+  }
+  if (!Object.keys(data).length) return badRequest(res, "Kuch change nahi mila");
+  const u = await prisma.user.update({ where: { id }, data });
+  res.json({
+    ok: true,
+    user: { id: u.id, name: u.name, mobile: u.mobile, email: u.email, conductor_id: u.conductor_id, photo_url: u.photo_url, role: u.role },
+  });
 }));
 
 // GET /api/driver/today — assigned trips for today + any already live

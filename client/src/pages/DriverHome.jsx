@@ -5,6 +5,7 @@ import { Page, Badge, EmptyState, Skeleton, LiveDot, Modal } from "../components
 import { toast, useAuth } from "../store";
 import ConductorsPanel from "./admin/ConductorsPanel";
 import TicketScanner from "../components/TicketScanner";
+import ConductorProfile from "../components/ConductorProfile";
 
 export default function DriverHome() {
   const { user, token } = useAuth();
@@ -13,6 +14,7 @@ export default function DriverHome() {
   const [openList, setOpenList] = useState(null); // jis trip ki passenger list khuli hai
   const [listData, setListData] = useState(null);
   const [scanTrip, setScanTrip] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const isAdmin = user?.role === "ADMIN";
 
@@ -66,14 +68,25 @@ export default function DriverHome() {
   /* ============ CONDUCTOR VIEW — routes search + passenger lists + scanner + PDF ============ */
   return (
     <Page className="mx-auto max-w-3xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-xl font-bold md:text-2xl">Conductor Console</h1>
-          <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Conductor"} 🙏</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setProfileOpen(true)} className="group relative shrink-0" title="My Profile kholo">
+            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-600 to-brand-900 font-display text-lg font-bold text-white shadow-card ring-2 ring-brand-200 transition group-hover:ring-saffron-400">
+              {user?.photo_url ? <img src={user.photo_url} alt="me" className="h-full w-full object-cover" /> : (user?.name || "C").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+            </span>
+            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] shadow-card">✏️</span>
+          </button>
+          <div>
+            <h1 className="font-display text-xl font-bold md:text-2xl">Conductor Console</h1>
+            <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Conductor"} 🙏</p>
+          </div>
         </div>
-        {user?.conductor_id && (
-          <span className="rounded-lg bg-brand-700 px-3 py-1.5 font-mono text-sm font-bold tracking-wider text-white shadow-card">{user.conductor_id}</span>
-        )}
+        <div className="flex items-center gap-2">
+          <button className="btn-ghost !py-1.5 text-xs" onClick={() => setProfileOpen(true)}>👤 My Profile</button>
+          {user?.conductor_id && (
+            <span className="rounded-lg bg-brand-700 px-3 py-1.5 font-mono text-sm font-bold tracking-wider text-white shadow-card">{user.conductor_id}</span>
+          )}
+        </div>
       </div>
 
       <div className="mb-4 rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 text-xs leading-relaxed text-brand-700">
@@ -177,6 +190,11 @@ export default function DriverHome() {
       {/* ---- SCANNER MODAL ---- */}
       <Modal open={!!scanTrip} onClose={() => { setScanTrip(null); if (openList) loadList(openList); }} title="📷 E-Ticket Scanner" maxW="max-w-lg">
         {scanTrip && <TicketScanner trip={scanTrip} onChanged={() => { if (openList) loadList(openList); load(); }} />}
+      </Modal>
+
+      {/* ---- MY PROFILE MODAL ---- */}
+      <Modal open={profileOpen} onClose={() => setProfileOpen(false)} title="👤 My Profile" maxW="max-w-md">
+        {profileOpen && <ConductorProfile onClose={() => setProfileOpen(false)} />}
       </Modal>
     </Page>
   );

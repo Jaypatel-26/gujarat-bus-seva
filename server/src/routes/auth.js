@@ -10,6 +10,7 @@ const publicUser = (u) => ({
   mobile: u.mobile,
   email: u.email,
   conductor_id: u.conductor_id,
+  photo_url: u.photo_url,
   role: u.role,
 });
 
