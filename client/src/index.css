@@ -25,6 +25,7 @@
   }
   .btn-primary { @apply btn bg-saffron text-ink shadow-card hover:bg-saffron-600 hover:text-white; }
   .btn-brand { @apply btn bg-brand-500 text-white shadow-card hover:bg-brand-600; }
+  .btn-scan { @apply btn bg-leaf font-bold text-white shadow-card hover:bg-leaf-600; }
   .btn-ghost { @apply btn border border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-600; }
   .btn-danger { @apply btn bg-danger-50 text-danger-600 hover:bg-danger hover:text-white; }
   .chip { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold; }

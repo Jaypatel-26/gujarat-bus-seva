@@ -71,7 +71,7 @@ export default function ConductorsPanel() {
           <h2 className="font-display text-[15px] font-semibold">
             🎫 Conductors {rows ? <span className="text-xs text-slate-400">({rows.length})</span> : null}
             <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-leaf-50 px-2 py-0.5 text-[10px] font-bold text-leaf-700">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-leaf-500" /> LIVE
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-leaf" /> LIVE
             </span>
           </h2>
           <p className="text-xs text-slate-500">Conductor apna profile badle to yaha <b>usi wakt</b> update dikhta hai — photo, naam, mobile, password sab</p>

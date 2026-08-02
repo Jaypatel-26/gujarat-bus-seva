@@ -133,7 +133,7 @@ export default function DriverHome() {
                   <button className={`btn-ghost ${openList === t.id ? "!bg-brand-100" : ""}`} onClick={() => toggleList(t)}>
                     👥 Passengers {openList === t.id ? "▲" : "▼"}
                   </button>
-                  <button className="btn-primary !bg-brand-700" onClick={() => setScanTrip(t)}>📷 Scan Ticket</button>
+                  <button className="btn-scan" onClick={() => setScanTrip(t)}>📷 Scan Ticket</button>
                   <a
                     className="btn-ghost"
                     href={`${API}/api/driver/${t.id}/manifest.pdf?token=${token}`}
