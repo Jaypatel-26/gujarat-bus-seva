@@ -24,6 +24,73 @@ const NAMES = ["Amit Patel", "Priya Shah", "Rahul Mehta", "Kinjal Desai", "Hardi
   "Neha Trivedi", "Jayesh Raval", "Bhavna Joshi", "Kiran Chaudhary", "Mansi Bhatt",
   "Rakesh Prajapati", "Foram Vora", "Nilesh Gohil", "Payal Makwana", "Viral Parikh"];
 
+/* 🚌 Conductor pool (80) — itne conductors ki har ek ko din ke sirf ~10 trips aayein.
+   Pehle 3 demo wale hain (GJ015500-502 / conductor123), baaki GJ015503+ bhi same password. */
+const CONDUCTOR_FIRST = ["Arjun", "Bhavesh", "Chirag", "Dhruv", "Farukh", "Gopal", "Harsh", "Imran", "Jignesh", "Ketan", "Laxman", "Milan"];
+const CONDUCTOR_LAST = ["Ahir", "Chavda", "Desai", "Gamit", "Jadeja", "Katara", "Parmar", "Vaghela"];
+const CONDUCTOR_POOL = (() => {
+  const pool = [
+    { name: "Mahesh Chauhan", mobile: "9000000002", conductorId: "GJ015500" },
+    { name: "Baldev Rathod", mobile: "9000000003", conductorId: "GJ015501" },
+    { name: "Suresh Damor", mobile: "9000000004", conductorId: "GJ015502" },
+  ];
+  let n = 0;
+  outer: for (const f of CONDUCTOR_FIRST) {
+    for (const l of CONDUCTOR_LAST) {
+      const idx = 3 + n;
+      if (idx >= 80) break outer;
+      pool.push({ name: `${f} ${l}`, mobile: `9810${String(600000 + n).slice(-6)}`, conductorId: `GJ0155${String(idx).padStart(2, "0")}` });
+      n++;
+    }
+  }
+  return pool;
+})();
+
+// Pool ke conductors ensure karo (kabhi delete/wipe nahi karta)
+async function ensureConductorPool() {
+  const out = [];
+  for (const c of CONDUCTOR_POOL) {
+    let u = await prisma.user.findFirst({ where: { OR: [{ conductor_id: c.conductorId }, { mobile: c.mobile }] } });
+    if (!u) {
+      u = await prisma.user.create({
+        data: { name: c.name, mobile: c.mobile, role: "DRIVER", conductor_id: c.conductorId, password_hash: hashPassword("conductor123"), password_plain: "conductor123" },
+      });
+    }
+    out.push(u);
+  }
+  return out;
+}
+
+// Agar aaj ke trips kuch hi conductors pe dheel ho (max > 3× ideal) to aaj+bhavi trips ko pool me barabar baanto
+async function rebalanceTrips(drivers) {
+  const todayStart = localDay(0);
+  const todayTrips = await prisma.trip.count({ where: { date: todayStart } });
+  if (!todayTrips || !drivers.length) return;
+  const ideal = Math.ceil(todayTrips / drivers.length);
+  const per = await prisma.trip.groupBy({ by: ["driver_id"], where: { date: todayStart }, _count: { _all: true } });
+  const maxLoad = per.reduce((m, p) => Math.max(m, p._count._all), 0);
+  if (maxLoad <= ideal * 3) return; // pehle se balanced
+  console.log(`🔁 Conductors badh gaye — ${todayTrips} trips ko ${drivers.length} conductors me baant rahe (~${ideal}/conductor/day)…`);
+  // Per-DAY round-robin (ids route-wise blocks me hain — global modulo se din bhar me uneven padta hai)
+  const N = drivers.length;
+  const all = await prisma.trip.findMany({ where: { date: { gte: todayStart } }, select: { id: true, date: true }, orderBy: [{ date: "asc" }, { id: "asc" }] });
+  const byDay = new Map();
+  for (const t of all) {
+    const key = t.date.toISOString().slice(0, 10);
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(t.id);
+  }
+  let dayIdx = 0;
+  for (const ids of byDay.values()) {
+    for (let k = 0; k < N; k++) {
+      const chunk = ids.filter((_, i) => i % N === (k + dayIdx) % N); // har din start rotate
+      if (chunk.length) await prisma.trip.updateMany({ where: { id: { in: chunk } }, data: { driver_id: drivers[k].id } });
+    }
+    dayIdx++;
+  }
+  console.log("✅ Trips barabar baant diye");
+}
+
 async function main() {
   const force = process.argv.includes("--force");
 
@@ -56,7 +123,11 @@ async function main() {
   const busCount = await prisma.bus.count();
   // Auto-reseed when seed data (routes/buses) grows beyond what's in the DB
   const stale = cityCount > 0 && (routeCount !== ROUTE_PAIRS.length * 2 || busCount !== BUSES.length);
+
+  // Conductors: pool hamesha ensure karo + trips barabar baanto (pehle hi seeded DB bhi cover)
   if (cityCount > 0 && !force && !stale) {
+    const pool = await ensureConductorPool();
+    await rebalanceTrips(pool);
     console.log("ℹ️  Database already seeded — skipping (use `node prisma/seed.js --force` to reset).");
     return;
   }
@@ -72,12 +143,11 @@ async function main() {
     data: CITIES.map((name, i) => ({ id: i + 1, name, state: "Gujarat", lat: CITY_COORDS[name][0], lng: CITY_COORDS[name][1] })),
   });
 
-  console.log("👥 Seeding users (admin / drivers / passengers)…");
+  console.log("👥 Seeding users (admin / conductors / passengers)…");
   await prisma.user.create({ data: { name: "GBS Admin", mobile: "9000000001", role: "ADMIN", email: "admin@gmail.com", password_hash: hashPassword("admin123") } });
   const drivers = [];
-  const DRIVER_NAMES = ["Mahesh Chauhan", "Baldev Rathod", "Suresh Damor"];
-  for (let i = 0; i < 3; i++) {
-    drivers.push(await prisma.user.create({ data: { name: DRIVER_NAMES[i], mobile: `900000000${i + 2}`, role: "DRIVER", conductor_id: `GJ01550${i}`, password_hash: hashPassword("conductor123"), password_plain: "conductor123" } }));
+  for (const c of CONDUCTOR_POOL) {
+    drivers.push(await prisma.user.create({ data: { name: c.name, mobile: c.mobile, role: "DRIVER", conductor_id: c.conductorId, password_hash: hashPassword("conductor123"), password_plain: "conductor123" } }));
   }
   await prisma.user.create({ data: { name: "Demo Passenger", mobile: "9876543210", role: "PASSENGER", email: "demo@gujaratbusseva.in", password_hash: hashPassword("demo123") } });
   const passengers = [];
