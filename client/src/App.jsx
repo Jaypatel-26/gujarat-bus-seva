@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, useIsPresent } from "framer-motion";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Toasts from "./components/Toasts";
@@ -30,6 +30,13 @@ function ScrollToTop() {
 function Protected({ roles, children }) {
   const { token, user } = useAuth();
   const loc = useLocation();
+  // BUG FIX (logout ke baad Login nahi khulta tha): jab page EXIT ho raha ho
+  // (AnimatePresence mode="wait" purane page ka exit animation ka wait karta hai),
+  // tab yaha se <Navigate> chalao ge to exit beech me toot jata hai aur
+  // AnimatePresence hamesha ke liye atak jata hai — Login page kabhi mount nahi hota.
+  // useIsPresent() exit ke time false deta hai → tab kuch mat karo, exit poora hone do.
+  const isPresent = useIsPresent();
+  if (!isPresent) return null;
   if (!token) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   if (roles && !roles.includes(user?.role)) return <Navigate to="/" replace />;
   return children;

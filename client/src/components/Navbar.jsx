@@ -21,10 +21,12 @@ export default function Navbar() {
   }, []);
 
   const doLogout = () => {
-    logout();
     setMenuOpen(false);
-    toast.info("Logged out. See you soon! 👋");
-    nav("/");
+    nav("/"); // pehle Home pe jao — phir auth clear, taaki purane protected page pe redirect race na bane
+    setTimeout(() => {
+      logout();
+      toast.info("Logged out. See you soon! 👋");
+    }, 80);
   };
 
   const links = (
