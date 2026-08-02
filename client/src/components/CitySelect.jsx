@@ -21,10 +21,10 @@ export default function CitySelect({ label, value, onChange, excludeId, placehol
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let base = cities.filter((c) => c.id !== excludeId);
-    if (needle) return base.filter((c) => c.name.toLowerCase().includes(needle)).slice(0, 10);
+    if (needle) return base.filter((c) => c.name.toLowerCase().includes(needle));
     const pop = POPULAR.map((n) => base.find((c) => c.name === n)).filter(Boolean);
     const rest = base.filter((c) => !POPULAR.includes(c.name));
-    return [...pop, ...rest].slice(0, 12);
+    return [...pop, ...rest]; // saari cities — scroll se sab dikhengi
   }, [cities, q, excludeId]);
 
   const choose = (city) => { onChange(city); setQ(""); setOpen(false); };
@@ -52,9 +52,9 @@ export default function CitySelect({ label, value, onChange, excludeId, placehol
           <motion.ul
             initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 2 }}
             transition={{ duration: 0.12 }}
-            className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-100 bg-white p-1.5 shadow-lift"
+            className="absolute z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-100 bg-white p-1.5 shadow-lift"
           >
-            {!q && <li className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Popular cities</li>}
+            {!q && <li className="px-3 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Popular cities • neeche sab hain, ya type karo</li>}
             {list.map((c) => (
               <li key={c.id}>
                 <button

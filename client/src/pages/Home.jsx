@@ -28,9 +28,12 @@ export default function Home() {
   return (
     <Page>
       {/* ---------- HERO ---------- */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-saffron/10" />
-        <div className="pointer-events-none absolute -left-32 bottom-0 h-80 w-80 rounded-full bg-brand-400/10" />
+      <section className="relative bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-saffron/10" />
+          <div className="absolute -left-32 bottom-0 h-80 w-80 rounded-full bg-brand-400/10" />
+          <div className="absolute bottom-4 right-6 hidden text-7xl md:block animate-floaty">🚌</div>
+        </div>
         <div className="mx-auto max-w-6xl px-4 pb-24 pt-14 md:pt-20">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <span className="chip border border-saffron-400/40 bg-saffron/15 text-saffron-100">
@@ -60,7 +63,6 @@ export default function Home() {
             <span>✓ Free date changes</span><span>✓ UPI / Cards / NetBanking</span><span>✓ QR e-ticket</span><span>✓ 24×7 support</span>
           </motion.p>
         </div>
-        <div className="pointer-events-none absolute bottom-4 right-6 hidden text-7xl md:block animate-floaty">🚌</div>
       </section>
 
       {/* ---------- POPULAR ROUTES ---------- */}
