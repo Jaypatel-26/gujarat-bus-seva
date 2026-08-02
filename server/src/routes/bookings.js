@@ -36,6 +36,9 @@ r.post("/", wrap(async (req, res) => {
   for (const p of passengers) {
     if (!p.name || !p.age || !p.gender) return badRequest(res, "Each passenger needs name, age and gender");
     if (p.age < 1 || p.age > 100) return badRequest(res, "Enter a valid age");
+    const mob = String(p.mobile || "").replace(/\D/g, "");
+    if (!/^[6-9]\d{9}$/.test(mob)) return badRequest(res, `Passenger "${p.name || ""}" ka sahi 10-digit mobile number daalo`);
+    if (p.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(p.email).trim())) return badRequest(res, `Passenger "${p.name || ""}" ka email sahi nahi hai`);
   }
 
   const trip = await prisma.trip.findUnique({
@@ -67,7 +70,13 @@ r.post("/", wrap(async (req, res) => {
       contact_email: contactEmail || null,
       contact_mobile: contactMobile || null,
       seats: { create: seatIds.map((id) => ({ seat_id: id })) },
-      passengers: { create: passengers.map((p) => ({ name: p.name.trim(), age: Number(p.age), gender: p.gender, seat_id: p.seatId })) },
+      passengers: {
+        create: passengers.map((p) => ({
+          name: p.name.trim(), age: Number(p.age), gender: p.gender, seat_id: p.seatId,
+          mobile: String(p.mobile || "").replace(/\D/g, "").slice(-10) || null,
+          email: p.email ? String(p.email).trim().toLowerCase() : null,
+        })),
+      },
     },
     include: fullBookingInclude,
   });

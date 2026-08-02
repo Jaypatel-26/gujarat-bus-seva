@@ -40,27 +40,39 @@ export default function Seats() {
 
   const toggle = (seat) => {
     if (occupied.has(seat.id)) return;
+    if (!selected.has(seat.id) && selected.size >= paxLimit) {
+      return toast.err(`Maximum ${paxLimit} seat${paxLimit > 1 ? "s" : ""} for this search`);
+    }
     setSelected((prev) => {
       const next = new Map(prev);
       if (next.has(seat.id)) next.delete(seat.id);
-      else if (next.size >= paxLimit) { toast.err(`Maximum ${paxLimit} seat${paxLimit > 1 ? "s" : ""} for this search`); return prev; }
       else next.set(seat.id, seat);
       return next;
     });
+    // Nayi seat select hote hi passenger details ka default ready rakho —
+    // mobile account se prefill, email sirf pehle passenger ko (baad me badal sakte ho)
+    if (!selected.has(seat.id)) {
+      setPassengers((p) => (p[seat.id]
+        ? p
+        : { ...p, [seat.id]: { gender: "M", age: "", name: "", mobile: user?.mobile || "", email: Object.keys(p).length === 0 ? (user?.email || "") : "" } }));
+    }
   };
 
   const selArr = [...selected.values()];
   const total = (trip?.fare || 0) * selArr.length;
 
   const setPax = (seatId, field, value) =>
-    setPassengers((p) => ({ ...p, [seatId]: { gender: "M", age: "", name: "", ...p[seatId], [field]: value } }));
+    setPassengers((p) => ({ ...p, [seatId]: { gender: "M", age: "", name: "", mobile: "", email: "", ...p[seatId], [field]: value } }));
 
   const proceed = async () => {
     if (!selArr.length) return toast.err("Select at least one seat");
     for (const s of selArr) {
       const p = passengers[s.id] || {};
       if (!p.name?.trim() || !p.age || Number(p.age) < 1) {
-        return toast.err(`Fill name & age for seat ${s.seat_number}`);
+        return toast.err(`Seat ${s.seat_number}: passenger ka name & age bharo`);
+      }
+      if (!/^[6-9]\d{9}$/.test(String(p.mobile || ""))) {
+        return toast.err(`Seat ${s.seat_number}: sahi 10-digit mobile number daalo`);
       }
     }
     setSubmitting(true);
@@ -68,7 +80,14 @@ export default function Seats() {
       const body = {
         tripId: trip.id,
         seatIds: selArr.map((s) => s.id),
-        passengers: selArr.map((s) => ({ seatId: s.id, name: passengers[s.id].name.trim(), age: Number(passengers[s.id].age), gender: passengers[s.id].gender || "M" })),
+        passengers: selArr.map((s) => ({
+          seatId: s.id,
+          name: passengers[s.id].name.trim(),
+          age: Number(passengers[s.id].age),
+          gender: passengers[s.id].gender || "M",
+          mobile: String(passengers[s.id].mobile || "").replace(/\D/g, "").slice(0, 10),
+          email: (passengers[s.id].email || "").trim() || undefined,
+        })),
         contactEmail: contactEmail || undefined,
         contactMobile: contactMobile || undefined,
       };
@@ -205,6 +224,10 @@ export default function Seats() {
                           <select className="input py-2" value={passengers[s.id]?.gender || "M"} onChange={(e) => setPax(s.id, "gender", e.target.value)}>
                             <option value="M">Male</option><option value="F">Female</option><option value="O">Other</option>
                           </select>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <input className="input py-2" placeholder="Mobile (is passenger ka)" inputMode="numeric" maxLength={10} value={passengers[s.id]?.mobile || ""} onChange={(e) => setPax(s.id, "mobile", e.target.value.replace(/\D/g, "").slice(0, 10))} />
+                          <input className="input py-2" placeholder="Email (optional)" type="email" value={passengers[s.id]?.email || ""} onChange={(e) => setPax(s.id, "email", e.target.value)} />
                         </div>
                       </div>
                     ))}

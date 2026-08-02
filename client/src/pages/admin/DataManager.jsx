@@ -5,8 +5,9 @@ import { Badge, Modal, Skeleton } from "../../components/ui";
 import { toast } from "../../store";
 import RouteStudio from "./RouteStudio";
 import ConductorsPanel from "./ConductorsPanel";
+import BookByPanel from "./BookByPanel";
 
-const TABS = ["Routes", "Buses", "Conductors", "Trips"];
+const TABS = ["Routes", "Buses", "Conductors", "Trips", "Book By"];
 
 export default function DataManager() {
   const [tab, setTab] = useState("Routes");
@@ -24,6 +25,7 @@ export default function DataManager() {
       {tab === "Buses" && <BusesTab />}
       {tab === "Conductors" && <DriversTab />}
       {tab === "Trips" && <TripsTab />}
+      {tab === "Book By" && <BookByPanel />}
     </div>
   );
 }

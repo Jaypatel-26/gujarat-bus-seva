@@ -144,6 +144,8 @@ model BookingPassenger {
   name       String
   age        Int
   gender     String // M | F | O
+  mobile     String? // seat booking ke waqt passenger ka apna mobile
+  email      String? // seat booking ke waqt passenger ka apna email (optional)
   booking    Booking @relation(fields: [booking_id], references: [id])
 
   @@map("booking_passengers")

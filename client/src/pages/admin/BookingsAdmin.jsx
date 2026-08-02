@@ -52,16 +52,15 @@ export default function BookingsAdmin() {
                   <td className="td font-mono text-xs font-semibold">{b.pnr}</td>
                   <td className="td">
                     {b.passengers?.length ? (
-                      <span title={b.passengers.map((p) => `${p.name} (${p.age}/${p.gender})`).join(", ")}>
+                      <span title={b.passengers.map((p) => `${p.name} — ${p.age}yr/${p.gender}, 📞 ${p.mobile || "—"}${p.email ? `, ✉ ${p.email}` : ""}`).join("\n")}>
                         <span className="block font-medium">
                           {b.passengers[0].name}
                           {b.passengers.length > 1 && <span className="ml-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-600">+{b.passengers.length - 1}</span>}
                         </span>
-                        <span className="text-[11px] text-slate-400">
-                          {b.passengers[0].age}/{b.passengers[0].gender}
-                          {b.user && b.passengers[0].name !== b.user ? ` • booked by ${b.user}` : ""}
-                          {b.mobile ? ` • ${b.mobile}` : ""}
+                        <span className="block text-[11px] text-slate-400">
+                          {b.passengers[0].age} yrs • {b.passengers[0].mobile ? `📞 ${b.passengers[0].mobile}` : "📞 —"}
                         </span>
+                        {b.passengers[0].email && <span className="block text-[11px] text-slate-400">✉ {b.passengers[0].email}</span>}
                       </span>
                     ) : (
                       <span><span className="block font-medium">{b.user}</span><span className="text-[11px] text-slate-400">{b.mobile}</span></span>
