@@ -364,7 +364,7 @@ r.get("/drivers", wrap(async (_req, res) => {
     include: { _count: { select: { drivenTrips: true } } },
     orderBy: { id: "asc" },
   });
-  res.json({ drivers: drivers.map((d) => ({ id: d.id, name: d.name, mobile: d.mobile, conductor_id: d.conductor_id, password: d.password_plain, trips: d._count.drivenTrips })) });
+  res.json({ drivers: drivers.map((d) => ({ id: d.id, name: d.name, mobile: d.mobile, conductor_id: d.conductor_id, password: d.password_plain, photo: d.photo_url, trips: d._count.drivenTrips })) });
 }));
 
 r.post("/drivers", wrap(async (req, res) => {
