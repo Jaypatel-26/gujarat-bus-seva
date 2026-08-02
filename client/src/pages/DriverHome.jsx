@@ -4,22 +4,22 @@ import { fmtTime, statusLabel, statusTone } from "../lib/format";
 import { Page, Badge, EmptyState, Skeleton, LiveDot, Modal } from "../components/ui";
 import { toast, useAuth } from "../store";
 import ConductorsPanel from "./admin/ConductorsPanel";
+import TicketScanner from "../components/TicketScanner";
 
 export default function DriverHome() {
   const { user } = useAuth();
   const [trips, setTrips] = useState(null);
-  const [me, setMe] = useState(null);
   const [busyId, setBusyId] = useState(null);
-  const [manifestTrip, setManifestTrip] = useState(null);
-  const [manifest, setManifest] = useState(null);
+  const [openList, setOpenList] = useState(null); // jis trip ki passenger list khuli hai
+  const [listData, setListData] = useState(null);
+  const [scanTrip, setScanTrip] = useState(null);
 
   const isAdmin = user?.role === "ADMIN";
 
   const load = () => api("/driver/today").then((d) => setTrips(d.trips)).catch((e) => toast.err(e.message));
   useEffect(() => {
-    if (isAdmin) return; // admin ko sirf Manage Conductors dikhana hai — trips load nahi
+    if (isAdmin) return; // admin ko sirf Manage Conductors dikhana hai
     load();
-    api("/driver/me").then(setMe).catch(() => {});
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
   }, [isAdmin]);
@@ -31,18 +31,19 @@ export default function DriverHome() {
       if (action === "start") toast.ok("Trip started — safe journey! 🚌");
       else toast.info("Trip marked as completed. Great job! 🏁");
       load();
-      api("/driver/me").then(setMe).catch(() => {});
     } catch (e) { toast.err(e.message); }
     setBusyId(null);
   };
 
-  const openManifest = async (trip) => {
-    setManifestTrip(trip);
-    setManifest(null);
-    try {
-      const d = await api(`/driver/${trip.id}/manifest`);
-      setManifest(d);
-    } catch (e) { toast.err(e.message); setManifestTrip(null); }
+  const loadList = async (tripId) => {
+    setListData(null);
+    try { setListData(await api(`/driver/${tripId}/manifest`)); }
+    catch (e) { toast.err(e.message); setOpenList(null); }
+  };
+  const toggleList = (trip) => {
+    if (openList === trip.id) { setOpenList(null); return; }
+    setOpenList(trip.id);
+    loadList(trip.id);
   };
 
   /* ============ ADMIN VIEW — sirf Manage Conductors ============ */
@@ -61,52 +62,22 @@ export default function DriverHome() {
     );
   }
 
-  /* ============ CONDUCTOR VIEW — apna profile + trips ============ */
-  const c = me?.conductor;
-
+  /* ============ CONDUCTOR VIEW — routes + passenger lists + ticket scanner ============ */
   return (
     <Page className="mx-auto max-w-3xl px-4 py-6">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="font-display text-xl font-bold md:text-2xl">Conductor Console</h1>
-          <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Conductor"} 🙏 — aaj ka schedule</p>
+          <p className="text-sm text-slate-500">Namaste, {user?.name?.split(" ")[0] || "Conductor"} 🙏</p>
         </div>
-        <span className="text-3xl">🚍</span>
+        {user?.conductor_id && (
+          <span className="rounded-lg bg-brand-700 px-3 py-1.5 font-mono text-sm font-bold tracking-wider text-white shadow-card">{user.conductor_id}</span>
+        )}
       </div>
 
-      {/* ---- Conductor details card ---- */}
-      {!me ? (
-        <Skeleton className="mb-4 h-28 w-full" />
-      ) : (
-        <div className="card mb-4 overflow-hidden p-0">
-          <div className="bg-gradient-to-r from-brand-700 to-brand-900 px-5 py-4 text-white">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 font-display text-lg font-bold ring-2 ring-white/30">
-                {(c?.name || user?.name || "C").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
-              </span>
-              <div className="flex-1">
-                <p className="font-display text-lg font-bold leading-tight">{c?.name || user?.name}</p>
-                <p className="text-xs text-brand-100">
-                  🎫 Conductor{c?.since ? ` • ${new Date(c.since).toLocaleDateString("en-IN", { month: "short", year: "numeric" })} se juda` : ""}
-                </p>
-              </div>
-              {(c?.conductor_id || user?.conductor_id) && (
-                <span className="rounded-lg bg-white/15 px-3 py-1.5 font-mono text-sm font-bold tracking-wider ring-1 ring-white/30">{c?.conductor_id || user?.conductor_id}</span>
-              )}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 p-4 text-center sm:grid-cols-4">
-            <div className="rounded-xl bg-mist p-2.5"><p className="text-lg font-bold text-brand-700">{me.stats.todayTrips}</p><p className="text-[10.5px] font-semibold text-slate-500">Aaj ke trips</p></div>
-            <div className="rounded-xl bg-mist p-2.5"><p className="text-lg font-bold text-leaf-700">{me.stats.live}</p><p className="text-[10.5px] font-semibold text-slate-500">Abhi LIVE</p></div>
-            <div className="rounded-xl bg-mist p-2.5"><p className="text-lg font-bold text-slate-700">{me.stats.completed}</p><p className="text-[10.5px] font-semibold text-slate-500">Poore kiye</p></div>
-            <div className="rounded-xl bg-mist p-2.5"><p className="text-lg font-bold text-slate-700">{c?.mobile || "—"}</p><p className="text-[10.5px] font-semibold text-slate-500">Mobile</p></div>
-          </div>
-        </div>
-      )}
-
-      <div className="mb-4 mt-2 rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 text-xs leading-relaxed text-brand-700">
-        📋 <b>Start Trip</b> dabate hi trip "In progress" ho jata hai aur passengers ko
-        station-wise route &amp; timings dikhti hain. Safar poora hone pe <b>Complete</b> dabao.
+      <div className="mb-4 rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 text-xs leading-relaxed text-brand-700">
+        📷 <b>Scan Ticket</b> se passenger ki e-ticket ka QR camera me dikhao — sahi trip ki ticket hai to <b>onboard</b> mark ho jayega.
+        Har trip ki <b>passenger list</b> uske neeche kholo. Safar shuru hone pe <b>Start Trip</b> dabao.
       </div>
 
       {!trips ? (
@@ -129,53 +100,67 @@ export default function DriverHome() {
                   <p className="mt-0.5 text-xs text-slate-400">👥 {t._count.bookings} booking{t._count.bookings !== 1 ? "s" : ""} on this trip</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button className="btn-ghost" onClick={() => openManifest(t)}>📋 Manifest</button>
+                  <button className={`btn-ghost ${openList === t.id ? "!bg-brand-100" : ""}`} onClick={() => toggleList(t)}>
+                    👥 Passengers {openList === t.id ? "▲" : "▼"}
+                  </button>
+                  <button className="btn-primary !bg-brand-700" onClick={() => setScanTrip(t)}>📷 Scan Ticket</button>
                   {t.status === "SCHEDULED" && (
-                    <button className="btn-primary" disabled={busyId === t.id} onClick={() => act(t, "start")}>
-                      {busyId === t.id ? "Starting…" : "▶ Start Trip"}
+                    <button className="btn-ghost" disabled={busyId === t.id} onClick={() => act(t, "start")}>
+                      {busyId === t.id ? "Starting…" : "▶ Start"}
                     </button>
                   )}
                   {t.status === "IN_PROGRESS" && (
-                    <>
-                      <span className="chip animate-pulse bg-leaf-50 text-leaf-700">🚌 Trip in progress…</span>
-                      <button className="btn-brand" disabled={busyId === t.id} onClick={() => act(t, "complete")}>
-                        {busyId === t.id ? "Finishing…" : "🏁 Complete Trip"}
-                      </button>
-                    </>
+                    <button className="btn-brand" disabled={busyId === t.id} onClick={() => act(t, "complete")}>
+                      {busyId === t.id ? "Finishing…" : "🏁 Complete"}
+                    </button>
                   )}
                 </div>
               </div>
+
+              {/* ---- inline passenger list ---- */}
+              {openList === t.id && (
+                <div className="mt-4 border-t border-slate-100 pt-3">
+                  {!listData ? (
+                    <Skeleton className="h-20 w-full" />
+                  ) : (
+                    <>
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-xs font-semibold text-slate-500">{listData.total} passengers • PNR/QR se verify karo</p>
+                        <span className="chip bg-leaf-50 font-bold text-leaf-700">✓ {listData.boarded}/{listData.total} onboard</span>
+                      </div>
+                      {listData.manifest.length === 0 ? (
+                        <p className="rounded-lg bg-mist px-3 py-3 text-center text-xs text-slate-400">Abhi koi confirmed passenger nahi.</p>
+                      ) : (
+                        <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-100">
+                          <table className="w-full min-w-[480px]">
+                            <thead className="sticky top-0 bg-mist/90"><tr className="text-left"><th className="th">Seat</th><th className="th">Passenger</th><th className="th">Age/G</th><th className="th">PNR</th><th className="th">Contact</th><th className="th">Status</th></tr></thead>
+                            <tbody>
+                              {listData.manifest.map((m, i) => (
+                                <tr key={i} className={`border-t border-slate-50 ${m.checked ? "bg-leaf-50/50" : ""}`}>
+                                  <td className="td"><span className="chip bg-brand-50 text-brand-600">{m.seat}</span></td>
+                                  <td className="td font-medium">{m.name}</td>
+                                  <td className="td text-xs">{m.age}/{m.gender}</td>
+                                  <td className="td font-mono text-xs">{m.pnr}</td>
+                                  <td className="td text-xs">{m.contact}</td>
+                                  <td className="td">{m.checked ? <span className="chip bg-leaf-100 font-bold text-leaf-700">✓ Onboard</span> : <span className="text-[11px] text-slate-400">—</span>}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      <Modal open={!!manifestTrip} onClose={() => setManifestTrip(null)} title={`Boarding List — ${manifestTrip?.route.fromCity.name} → ${manifestTrip?.route.toCity.name}`} maxW="max-w-2xl">
-        {!manifest ? (
-          <Skeleton className="h-40 w-full" />
-        ) : manifest.manifest.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No confirmed passengers yet.</p>
-        ) : (
-          <>
-            <p className="mb-2 text-xs font-semibold text-slate-500">{manifest.total} passengers • verify each by PNR or QR on the e-ticket</p>
-            <div className="max-h-80 overflow-y-auto rounded-xl border border-slate-100">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-white"><tr><th className="th">Seat</th><th className="th">Passenger</th><th className="th">Age/Gender</th><th className="th">PNR</th><th className="th">Contact</th></tr></thead>
-                <tbody>
-                  {manifest.manifest.map((m, i) => (
-                    <tr key={i}>
-                      <td className="td"><span className="chip bg-brand-50 text-brand-600">{m.seat}</span></td>
-                      <td className="td font-medium">{m.name}</td>
-                      <td className="td">{m.age}/{m.gender}</td>
-                      <td className="td font-mono text-xs">{m.pnr}</td>
-                      <td className="td text-xs">{m.contact}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
+      {/* ---- SCANNER MODAL ---- */}
+      <Modal open={!!scanTrip} onClose={() => { setScanTrip(null); if (openList) loadList(openList); }} title="📷 E-Ticket Scanner" maxW="max-w-lg">
+        {scanTrip && <TicketScanner trip={scanTrip} onChanged={() => { if (openList) loadList(openList); load(); }} />}
       </Modal>
     </Page>
   );

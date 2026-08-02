@@ -11,6 +11,7 @@ export default defineConfig({
           react: ["react", "react-dom", "react-router-dom"],
           charts: ["recharts"],
           motion: ["framer-motion"],
+          scanner: ["html5-qrcode"],
         },
       },
     },

@@ -111,6 +111,7 @@ model Booking {
   total_fare     Float
   status         String             @default("PENDING") // PENDING | CONFIRMED | CANCELLED
   qr_code        String?
+  checked_in_at  DateTime? // conductor ne ticket scan karke onboard kiya
   contact_email  String?
   contact_mobile String?
   created_at     DateTime           @default(now())
