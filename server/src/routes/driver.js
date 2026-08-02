@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { authRequired } from "../middleware/auth.js";
 import { wrap, notFound, badRequest } from "../lib/util.js";
+import { streamManifestPdf } from "../lib/ticket.js";
 
 const r = Router();
 r.use(authRequired("DRIVER", "ADMIN"));
@@ -76,6 +77,26 @@ r.get("/:id/manifest", wrap(async (req, res) => {
   }
   rows.sort((a, b2) => String(a.seat).localeCompare(String(b2.seat), "en", { numeric: true }));
   res.json({ manifest: rows, total: rows.length, boarded });
+}));
+
+// GET /api/driver/:id/manifest.pdf — passenger list PDF download (browser ?token= se bhi)
+r.get("/:id/manifest.pdf", wrap(async (req, res) => {
+  const trip = await ownTrip(req, res);
+  if (!trip) return;
+  const conductor = await prisma.user.findUnique({ where: { id: trip.driver_id || -1 }, select: { name: true, conductor_id: true } }).catch(() => null);
+  const bookings = await prisma.booking.findMany({
+    where: { trip_id: trip.id, status: "CONFIRMED" },
+    include: { passengers: true, seats: { include: { seat: true } }, user: { select: { name: true, mobile: true } } },
+  });
+  const rows = [];
+  for (const b of bookings) {
+    const seatById = new Map(b.seats.map((s) => [s.seat_id, s.seat.seat_number]));
+    for (const p of b.passengers) {
+      rows.push({ seat: seatById.get(p.seat_id) || "-", name: p.name, age: p.age, gender: p.gender, pnr: b.pnr, contact: b.user.mobile, checked: !!b.checked_in_at });
+    }
+  }
+  rows.sort((a, b2) => String(a.seat).localeCompare(String(b2.seat), "en", { numeric: true }));
+  streamManifestPdf({ trip, conductor, rows, res });
 }));
 
 // Ticket ka text (QR content ya seedha PNR) se PNR nikaalo

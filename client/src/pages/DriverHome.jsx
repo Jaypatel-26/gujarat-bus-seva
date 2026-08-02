@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, busTypeLabel } from "../api";
+import { useEffect, useMemo, useState } from "react";
+import { api, busTypeLabel, API } from "../api";
 import { fmtTime, statusLabel, statusTone } from "../lib/format";
 import { Page, Badge, EmptyState, Skeleton, LiveDot, Modal } from "../components/ui";
 import { toast, useAuth } from "../store";
@@ -7,9 +7,9 @@ import ConductorsPanel from "./admin/ConductorsPanel";
 import TicketScanner from "../components/TicketScanner";
 
 export default function DriverHome() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [trips, setTrips] = useState(null);
-  const [busyId, setBusyId] = useState(null);
+  const [q, setQ] = useState("");
   const [openList, setOpenList] = useState(null); // jis trip ki passenger list khuli hai
   const [listData, setListData] = useState(null);
   const [scanTrip, setScanTrip] = useState(null);
@@ -24,16 +24,17 @@ export default function DriverHome() {
     return () => clearInterval(t);
   }, [isAdmin]);
 
-  const act = async (trip, action) => {
-    setBusyId(trip.id);
-    try {
-      await api(`/driver/${trip.id}/${action}`, { method: "POST" });
-      if (action === "start") toast.ok("Trip started — safe journey! 🚌");
-      else toast.info("Trip marked as completed. Great job! 🏁");
-      load();
-    } catch (e) { toast.err(e.message); }
-    setBusyId(null);
-  };
+  const filtered = useMemo(() => {
+    if (!trips) return null;
+    const s = q.trim().toLowerCase();
+    if (!s) return trips;
+    return trips.filter((t) =>
+      t.route.fromCity.name.toLowerCase().includes(s) ||
+      t.route.toCity.name.toLowerCase().includes(s) ||
+      `${t.route.fromCity.name} ${t.route.toCity.name}`.toLowerCase().includes(s) ||
+      t.bus.bus_number.toLowerCase().includes(s)
+    );
+  }, [trips, q]);
 
   const loadList = async (tripId) => {
     setListData(null);
@@ -62,7 +63,7 @@ export default function DriverHome() {
     );
   }
 
-  /* ============ CONDUCTOR VIEW — routes + passenger lists + ticket scanner ============ */
+  /* ============ CONDUCTOR VIEW — routes search + passenger lists + scanner + PDF ============ */
   return (
     <Page className="mx-auto max-w-3xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
@@ -77,16 +78,32 @@ export default function DriverHome() {
 
       <div className="mb-4 rounded-2xl border border-brand-100 bg-brand-50/60 p-3.5 text-xs leading-relaxed text-brand-700">
         📷 <b>Scan Ticket</b> se passenger ki e-ticket ka QR camera me dikhao — sahi trip ki ticket hai to <b>onboard</b> mark ho jayega.
-        Har trip ki <b>passenger list</b> uske neeche kholo. Safar shuru hone pe <b>Start Trip</b> dabao.
+        Har trip ki <b>passenger list</b> kholo aur <b>⬇ PDF</b> se download bhi kar sakte ho.
       </div>
 
-      {!trips ? (
+      {/* ---- route search ---- */}
+      <div className="relative mb-4">
+        <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+        <input
+          className="input !pl-10"
+          placeholder="Route dhundo — city ka naam ya bus number likho (e.g. Surat, GJ-27…)"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
+
+      {!filtered ? (
         <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}</div>
-      ) : trips.length === 0 ? (
-        <EmptyState icon="🌤️" title="No trips assigned today" subtitle="Enjoy your day off! New assignments appear here automatically." />
+      ) : filtered.length === 0 ? (
+        q ? (
+          <EmptyState icon="🔍" title={`"${q}" ke liye koi route nahi mila`} subtitle="Doosri city ka naam try karo, ya search box khali kar do." />
+        ) : (
+          <EmptyState icon="🌤️" title="No trips assigned today" subtitle="Enjoy your day off! New assignments appear here automatically." />
+        )
       ) : (
         <div className="space-y-3">
-          {trips.map((t) => (
+          <p className="text-[11px] font-semibold text-slate-400">{filtered.length} trip{filtered.length !== 1 ? "s" : ""} {q ? `“${q}” ke liye` : "aaj"}</p>
+          {filtered.map((t) => (
             <div key={t.id} className="card p-4 transition hover:shadow-lift">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -104,16 +121,15 @@ export default function DriverHome() {
                     👥 Passengers {openList === t.id ? "▲" : "▼"}
                   </button>
                   <button className="btn-primary !bg-brand-700" onClick={() => setScanTrip(t)}>📷 Scan Ticket</button>
-                  {t.status === "SCHEDULED" && (
-                    <button className="btn-ghost" disabled={busyId === t.id} onClick={() => act(t, "start")}>
-                      {busyId === t.id ? "Starting…" : "▶ Start"}
-                    </button>
-                  )}
-                  {t.status === "IN_PROGRESS" && (
-                    <button className="btn-brand" disabled={busyId === t.id} onClick={() => act(t, "complete")}>
-                      {busyId === t.id ? "Finishing…" : "🏁 Complete"}
-                    </button>
-                  )}
+                  <a
+                    className="btn-ghost"
+                    href={`${API}/api/driver/${t.id}/manifest.pdf?token=${token}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Passenger list PDF download"
+                  >
+                    ⬇ PDF
+                  </a>
                 </div>
               </div>
 

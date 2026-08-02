@@ -92,3 +92,73 @@ export async function streamTicketPdf(booking, res) {
 
   doc.end();
 }
+
+const BLUE2 = "#0F4C81";
+const GREY2 = "#64748B";
+
+// Conductor ka passenger manifest PDF — ek page table format
+export function streamManifestPdf({ trip, conductor, rows, res }) {
+  const route = trip.route;
+  const doc = new PDFDocument({ size: "A4", margin: 46 });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="GBS-manifest-${route.fromCity.name}-${route.toCity.name}.pdf"`);
+  doc.pipe(res);
+
+  const COLX = [46, 96, 248, 305, 397, 489]; // #, Seat, Name, Age/G, PNR, Onboard col starts
+  const tableHead = (y0) => {
+    doc.rect(46, y0, 516, 20).fill("#EAF2FB");
+    doc.fillColor(BLUE2).font("Helvetica-Bold").fontSize(8.5);
+    doc.text("SEAT", 50, y0 + 6, { width: 44 });
+    doc.text("PASSENGER", COLX[1], y0 + 6, { width: 148 });
+    doc.text("AGE/G", COLX[2], y0 + 6, { width: 55 });
+    doc.text("PNR / MOBILE", COLX[3], y0 + 6, { width: 140 });
+    doc.text("STATUS", COLX[5], y0 + 6, { width: 70, align: "right" });
+  };
+
+  // header band
+  doc.rect(0, 0, doc.page.width, 84).fill(BLUE2);
+  doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(18).text("GUJARAT BUS SEVA", 46, 24);
+  doc.font("Helvetica").fontSize(9).fillColor("#CFE3F7").text("PASSENGER MANIFEST — conductor copy", 46, 47);
+
+  let y = 106;
+  doc.font("Helvetica-Bold").fontSize(16).fillColor("#0F172A")
+    .text(`${route.fromCity.name}  →  ${route.toCity.name}`, 46, y);
+  y += 22;
+  doc.font("Helvetica").fontSize(9.5).fillColor(GREY2)
+    .text(`Date: ${fmtDate(trip.date)}    Departure: ${fmtTime(trip.departure_time)}    Arrival: ${fmtTime(trip.arrival_time)}`, 46, y);
+  y += 14;
+  doc.text(`Bus: ${trip.bus.bus_number} (${trip.bus.operator_name})    Conductor: ${conductor?.name || "—"}${conductor?.conductor_id ? ` [${conductor.conductor_id}]` : ""}`, 46, y);
+  y += 14;
+  const onboard = rows.filter((r) => r.checked).length;
+  doc.font("Helvetica-Bold").fillColor("#15803D").text(`Passengers: ${rows.length}    Onboard (scanned): ${onboard}    Remaining: ${rows.length - onboard}`, 46, y);
+  y += 22;
+
+  tableHead(y);
+  y += 24;
+  doc.font("Helvetica").fontSize(9);
+
+  if (!rows.length) {
+    doc.fillColor(GREY2).text("Koi confirmed passenger nahi hai is trip pe.", 46, y + 6, { align: "center", width: 516 });
+  }
+
+  rows.forEach((r, i) => {
+    if (y > 756) { doc.addPage(); y = 60; tableHead(y); y += 24; doc.font("Helvetica").fontSize(9); }
+    if (i % 2 === 0) doc.rect(46, y - 4, 516, 20).fill(r.checked ? "#EDFAF3" : "#F8FAFC");
+    doc.fillColor(r.checked ? "#15803D" : "#0F172A");
+    doc.text(r.seat, 50, y, { width: 44 });
+    doc.text(r.name, COLX[1], y, { width: 148 });
+    doc.text(`${r.age}/${r.gender}`, COLX[2], y, { width: 55 });
+    doc.fontSize(8).text(`${r.pnr}  •  ${r.contact}`, COLX[3], y, { width: 140 });
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(r.checked ? "#15803D" : "#94A3B8")
+      .text(r.checked ? "✓ ONBOARD" : "—", COLX[5] - 3, y, { width: 76, align: "right" });
+    doc.font("Helvetica").fontSize(9);
+    y += 20;
+    doc.moveTo(46, y - 5).lineTo(562, y - 5).lineWidth(0.4).strokeColor("#E2E8F0").stroke();
+  });
+
+  if (y > 730) { doc.addPage(); y = 60; }
+  doc.roundedRect(46, 744, 516, 34, 8).fill("#FFF7E8");
+  doc.fillColor(BLUE2).fontSize(8).font("Helvetica")
+    .text(`Generated ${new Date().toLocaleString("en-IN")} • Gujarat Bus Seva • Helpline 1800-419-0001`, 46, 756, { width: 516, align: "center" });
+  doc.end();
+}
