@@ -431,7 +431,7 @@ r.get("/trips", wrap(async (req, res) => {
     where: { date: dayStart(date) },
     include: {
       route: { include: { fromCity: true, toCity: true } },
-      bus: true, driver: { select: { name: true } },
+      bus: true, driver: { select: { name: true, conductor_id: true } },
       _count: { select: { bookings: true } },
     },
     orderBy: { departure_time: "asc" },
@@ -441,9 +441,19 @@ r.get("/trips", wrap(async (req, res) => {
 }));
 
 r.put("/trips/:id", wrap(async (req, res) => {
-  const status = String(req.body.status || "").toUpperCase();
-  if (!["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].includes(status)) return badRequest(res, "Invalid status");
-  const trip = await prisma.trip.update({ where: { id: Number(req.params.id) }, data: { status } });
+  const data = {};
+  if (req.body.status) {
+    const status = String(req.body.status).toUpperCase();
+    if (!["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].includes(status)) return badRequest(res, "Invalid status");
+    data.status = status;
+  }
+  if (req.body.driverId != null) {
+    const driver = await prisma.user.findFirst({ where: { id: Number(req.body.driverId), role: "DRIVER" }, select: { id: true } });
+    if (!driver) return badRequest(res, "Conductor not found");
+    data.driver_id = driver.id;
+  }
+  if (!Object.keys(data).length) return badRequest(res, "Kuch change nahi mila");
+  const trip = await prisma.trip.update({ where: { id: Number(req.params.id) }, data });
   res.json({ ok: true, trip });
 }));
 

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { api, loadCities, busTypeLabel } from "../../api";
-import { fmtTime, fmtDate, statusLabel, statusTone, todayStr, inr } from "../../lib/format";
+import { fmtTime, todayStr, inr } from "../../lib/format";
 import { Badge, Modal, Skeleton } from "../../components/ui";
 import { toast } from "../../store";
 import RouteStudio from "./RouteStudio";
 import ConductorsPanel from "./ConductorsPanel";
 
-const TABS = ["Routes", "Buses", "Conductors", "Trips", "Assignments"];
+const TABS = ["Routes", "Buses", "Conductors", "Trips"];
 
 export default function DataManager() {
   const [tab, setTab] = useState("Routes");
@@ -24,7 +24,6 @@ export default function DataManager() {
       {tab === "Buses" && <BusesTab />}
       {tab === "Conductors" && <DriversTab />}
       {tab === "Trips" && <TripsTab />}
-      {tab === "Assignments" && <AssignmentsTab />}
     </div>
   );
 }
@@ -276,171 +275,83 @@ function DriversTab() {
   return <ConductorsPanel />;
 }
 
-/* ---------------- Assignments (route ↔ conductor) ---------------- */
-function AssignmentsTab() {
-  const [data, setData] = useState(null);
-  const [q, setQ] = useState("");
-  const [editRoute, setEditRoute] = useState(null);
-  const [driverId, setDriverId] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const load = () => api("/admin/assignments").then(setData).catch((e) => toast.err(e.message));
-  useEffect(() => { load(); }, []);
-
-  const openEdit = (r) => { setEditRoute(r); setDriverId(String(r.conductors[0]?.id || "")); };
-  const save = async () => {
-    if (!driverId || busy) return;
-    setBusy(true);
-    try {
-      const d = await api(`/admin/assignments/${editRoute.id}`, { method: "PUT", body: { driverId: Number(driverId) } });
-      toast.ok(`✅ ${d.tripsUpdated} trips ab ${d.conductor.name} (${d.conductor.conductor_id}) ke hain`);
-      setEditRoute(null);
-      load();
-    } catch (e) { toast.err(e.message); }
-    finally { setBusy(false); }
-  };
-
-  if (!data) return <Skeleton className="h-80 w-full" />;
-  const s2 = q.trim().toLowerCase();
-  const rows = data.routes.filter((r) => !s2 || `${r.from} ${r.to}`.toLowerCase().includes(s2));
-
-  return (
-    <div className="card overflow-x-auto p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-display text-[15px] font-semibold">Route-wise conductor duty ({rows.length})</h3>
-        <div className="relative">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
-          <input className="input !py-1.5 !pl-9 text-xs w-60" placeholder="Route dhundo (city ka naam)…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-      </div>
-      <p className="mb-2 text-[11px] text-slate-400">💡 Har route pe aaj ke baad ke trips kaun chala raha hai — ✏️ Edit se kisi bhi route ka conductor badal sakte ho (us route ke saare aane wale SCHEDULED trips us conductor ko mil jayenge).</p>
-      <table className="w-full min-w-[640px]">
-        <thead><tr><th className="th">Route</th><th className="th">Conductor(s)</th><th className="th">Trips</th><th className="th"></th></tr></thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="transition hover:bg-mist/60">
-              <td className="td font-medium">{r.from} → {r.to}<span className="ml-1 text-[10px] text-slate-400">{r.distance_km} km</span></td>
-              <td className="td">
-                {r.conductors.length === 0 ? (
-                  <span className="text-xs text-slate-400">—</span>
-                ) : (
-                  <div className="flex max-w-[340px] flex-wrap gap-1">
-                    {r.conductors.slice(0, 3).map((c) => (
-                      <span key={c.id} className="chip bg-brand-50 text-brand-700 !text-[11px]" title={`${c.name} • ${c.trips} trips`}>
-                        {c.name} <b className="font-mono">{c.conductor_id}</b>{c.trips > 1 ? ` ×${c.trips}` : ""}
-                      </span>
-                    ))}
-                    {r.conductors.length > 3 && <span className="chip bg-mist text-slate-500 !text-[11px]">+{r.conductors.length - 3} aur</span>}
-                  </div>
-                )}
-              </td>
-              <td className="td">{r.trips}</td>
-              <td className="td text-right">
-                <button className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => openEdit(r)} disabled={r.trips === 0}>✏️ Edit</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <Modal open={!!editRoute} onClose={() => setEditRoute(null)} title="Conductor badlo">
-        {editRoute && (
-          <div className="space-y-3">
-            <div className="rounded-xl bg-mist p-3">
-              <p className="font-display text-[15px] font-bold">{editRoute.from} → {editRoute.to}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{editRoute.trips} upcoming trips • abhi: {editRoute.conductors.length ? editRoute.conductors.map((c) => `${c.name} (${c.conductor_id})`).join(", ") : "koi nahi"}</p>
-            </div>
-            <div>
-              <label className="label">Naya conductor (saare upcoming SCHEDULED trips usko)</label>
-              <select className="input" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
-                <option value="">Select…</option>
-                {data.drivers.map((d) => <option key={d.id} value={d.id}>{d.name} — {d.conductor_id}</option>)}
-              </select>
-            </div>
-            <p className="rounded-lg bg-saffron-50 p-2 text-xs text-saffron-700">⚠️ Save karte hi is route ke saare aane wale trips selected conductor ko chale jayenge.</p>
-            <button className="btn-primary w-full" disabled={!driverId || busy} onClick={save}>{busy ? "Saving…" : "Save assignment"}</button>
-          </div>
-        )}
-      </Modal>
-    </div>
-  );
-}
-
 /* ---------------- Trips ---------------- */
 function TripsTab() {
   const [date, setDate] = useState(todayStr());
   const [trips, setTrips] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [aux, setAux] = useState({ routes: [], buses: [] });
-  const [form, setForm] = useState({ route_id: "", bus_id: "", date: todayStr(), time: "18:00" });
+  const [drivers, setDrivers] = useState([]);
+  const [editTrip, setEditTrip] = useState(null);
+  const [driverId, setDriverId] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const load = () => api(`/admin/trips?date=${date}`).then((d) => setTrips(d.trips));
   useEffect(() => { setTrips(null); load(); }, [date]);
   useEffect(() => {
-    api("/admin/routes").then((d) => setAux((a) => ({ ...a, routes: d.routes })));
-    api("/admin/buses").then((d) => setAux((a) => ({ ...a, buses: d.buses })));
+    api("/admin/drivers").then((d) => setDrivers(d.drivers)).catch(() => {});
   }, []);
 
-  const setStatus = async (id, status) => {
-    try { await api(`/admin/trips/${id}`, { method: "PUT", body: { status } }); toast.ok(`Trip → ${statusLabel(status)}`); load(); }
-    catch (e) { toast.err(e.message); }
-  };
-  const add = async () => {
-    try { await api("/admin/trips", { method: "POST", body: { ...form, route_id: Number(form.route_id), bus_id: Number(form.bus_id) } }); toast.ok("Trip scheduled"); setOpen(false); load(); }
-    catch (e) { toast.err(e.message); }
+  const openEdit = (t) => { setEditTrip(t); setDriverId(String(t.driver?.id ?? t.driver_id ?? "")); };
+
+  const save = async () => {
+    if (!driverId || busy) return;
+    setBusy(true);
+    try {
+      await api(`/admin/trips/${editTrip.id}`, { method: "PUT", body: { driverId: Number(driverId) } });
+      const d = drivers.find((x) => String(x.id) === String(driverId));
+      toast.ok(`✅ Is trip ka conductor ab ${d?.name || "naya"} (${d?.conductor_id || ""}) hai`);
+      setEditTrip(null);
+      load();
+    } catch (e) { toast.err(e.message); }
+    finally { setBusy(false); }
   };
 
   return (
     <div className="card overflow-x-auto p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-[15px] font-semibold">Trips & schedule</h3>
-        <div className="flex items-center gap-2">
-          <input type="date" className="input w-40 py-1.5 text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
-          <button className="btn-brand py-1.5 text-xs" onClick={() => setOpen(true)}>+ Schedule trip</button>
-        </div>
+        <input type="date" className="input w-40 py-1.5 text-xs" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
       {!trips ? <Skeleton className="h-60 w-full" /> : trips.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-400">No trips on {date}. They appear automatically when passengers search.</p>
       ) : (
-        <table className="w-full min-w-[700px]">
-          <thead><tr><th className="th">Route</th><th className="th">Departure</th><th className="th">Bus</th><th className="th">Conductor</th><th className="th">Bookings</th><th className="th">Status</th></tr></thead>
-          <tbody>
-            {trips.map((t) => (
-              <tr key={t.id} className="hover:bg-mist/60">
-                <td className="td font-medium">{t.route.fromCity.name} → {t.route.toCity.name}</td>
-                <td className="td">{fmtTime(t.departure_time)}</td>
-                <td className="td font-mono text-xs">{t.bus.bus_number}</td>
-                <td className="td">{t.driver?.name || "—"}</td>
-                <td className="td">{t._count.bookings}</td>
-                <td className="td">
-                  <select value={t.status} onChange={(e) => setStatus(t.id, e.target.value)}
-                    className={`chip cursor-pointer border-0 outline-none ${statusTone(t.status) === "green" ? "bg-leaf-50 text-leaf-700" : statusTone(t.status) === "red" ? "bg-danger-50 text-danger-600" : statusTone(t.status) === "blue" ? "bg-brand-50 text-brand-600" : "bg-slate-100 text-slate-600"}`}>
-                    {["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"].map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <p className="mb-2 text-[11px] text-slate-400">💡 ✏️ Edit se kisi bhi trip ka conductor badal sakte ho.</p>
+          <table className="w-full min-w-[620px]">
+            <thead><tr><th className="th">Route</th><th className="th">Departure</th><th className="th">Bus</th><th className="th">Conductor</th><th className="th"></th></tr></thead>
+            <tbody>
+              {trips.map((t) => (
+                <tr key={t.id} className="hover:bg-mist/60">
+                  <td className="td font-medium">{t.route.fromCity.name} → {t.route.toCity.name}</td>
+                  <td className="td">{fmtTime(t.departure_time)}</td>
+                  <td className="td font-mono text-xs">{t.bus.bus_number}</td>
+                  <td className="td">{t.driver?.name ? <>{t.driver.name} <span className="font-mono text-xs font-semibold text-brand-700">({t.driver.conductor_id || "—"})</span></> : "—"}</td>
+                  <td className="td text-right">
+                    <button className="text-xs font-semibold text-brand-600 hover:underline" onClick={() => openEdit(t)}>✏️ Edit</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
-      <Modal open={open} onClose={() => setOpen(false)} title="Schedule a trip">
-        <div className="space-y-3">
-          <div><label className="label">Route</label>
-            <select className="input" value={form.route_id} onChange={(e) => setForm({ ...form, route_id: e.target.value })}>
-              <option value="">Select…</option>
-              {aux.routes.map((r) => <option key={r.id} value={r.id}>{r.fromCity.name} → {r.toCity.name} ({r.distance_km} km)</option>)}
-            </select></div>
-          <div><label className="label">Bus</label>
-            <select className="input" value={form.bus_id} onChange={(e) => setForm({ ...form, bus_id: e.target.value })}>
-              <option value="">Select…</option>
-              {aux.buses.map((b) => <option key={b.id} value={b.id}>{b.bus_number} • {b.operator_name}</option>)}
-            </select></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">Date</label><input type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
-            <div><label className="label">Departure time</label><input type="time" className="input" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} /></div>
+
+      <Modal open={!!editTrip} onClose={() => setEditTrip(null)} title="✏️ Conductor badlo">
+        {editTrip && (
+          <div className="space-y-3">
+            <div className="rounded-xl bg-mist p-3">
+              <p className="font-display text-[15px] font-bold">{editTrip.route.fromCity.name} → {editTrip.route.toCity.name}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{fmtTime(editTrip.departure_time)} • {editTrip.bus.bus_number} • abhi: {editTrip.driver?.name || "—"} ({editTrip.driver?.conductor_id || "—"})</p>
+            </div>
+            <div>
+              <label className="label">Naya conductor</label>
+              <select className="input" value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+                <option value="">Select…</option>
+                {drivers.map((d) => <option key={d.id} value={d.id}>{d.name} — ({d.conductor_id})</option>)}
+              </select>
+            </div>
+            <button className="btn-primary w-full" disabled={!driverId || busy} onClick={save}>{busy ? "Saving…" : "Save conductor"}</button>
           </div>
-          <button className="btn-primary w-full" onClick={add} disabled={!form.route_id || !form.bus_id}>Schedule</button>
-        </div>
+        )}
       </Modal>
     </div>
   );
