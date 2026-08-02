@@ -22,7 +22,10 @@ export default function BookingsAdmin() {
   return (
     <div className="card p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-display text-[15px] font-semibold">All bookings {rows && <span className="text-xs font-normal text-slate-400">({rows.length})</span>}</h3>
+        <div>
+          <h3 className="font-display text-[15px] font-semibold">All bookings {rows && <span className="text-xs font-normal text-slate-400">({rows.length})</span>}</h3>
+          <p className="text-[11px] text-slate-400"><b>PASSENGER</b> = seat book karte waqt likha asli yatri • <b>BOOKED BY</b> = jis account ne booking ki</p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="input flex w-52 items-center gap-2 py-1.5">
             <Search size={14} className="text-slate-400" />
@@ -44,8 +47,8 @@ export default function BookingsAdmin() {
         <EmptyState icon="🧾" title="No bookings found" subtitle="Try a different search or filter." />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead><tr><th className="th">PNR</th><th className="th">Passenger</th><th className="th">Route</th><th className="th">Journey</th><th className="th">Seats</th><th className="th">Fare</th><th className="th">Payment</th><th className="th">Status</th></tr></thead>
+          <table className="w-full min-w-[980px]">
+            <thead><tr><th className="th">PNR</th><th className="th">Passenger</th><th className="th">Booked By</th><th className="th">Route</th><th className="th">Journey</th><th className="th">Seats</th><th className="th">Fare</th><th className="th">Payment</th><th className="th">Status</th></tr></thead>
             <tbody>
               {rows.map((b) => (
                 <tr key={b.pnr} className="hover:bg-mist/60">
@@ -65,6 +68,11 @@ export default function BookingsAdmin() {
                     ) : (
                       <span><span className="block font-medium">{b.user}</span><span className="text-[11px] text-slate-400">{b.mobile}</span></span>
                     )}
+                  </td>
+                  <td className="td" title="Jis account ne booking ki">
+                    <span className="block font-medium">{b.user}</span>
+                    <span className="block text-[11px] text-slate-400">📞 {b.mobile || "—"}</span>
+                    {b.email && <span className="block text-[11px] text-slate-400">✉ {b.email}</span>}
                   </td>
                   <td className="td">{b.route}</td>
                   <td className="td text-xs">{fmtDate(b.date)}</td>

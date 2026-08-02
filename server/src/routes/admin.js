@@ -132,7 +132,7 @@ r.get("/bookings", wrap(async (req, res) => {
   res.json({
     bookings: rows.map((b) => ({
       pnr: b.pnr, status: b.status, total: b.total_fare, bookedAt: b.created_at,
-      user: b.user?.name || "—", mobile: b.user?.mobile || "",
+      user: b.user?.name || "—", mobile: b.user?.mobile || "", email: b.user?.email || "", // booking karne wala account (Booked By column)
       passengers: b.passengers.map((p) => ({ name: p.name, age: p.age, gender: p.gender, mobile: p.mobile, email: p.email })), // seat time ka asli passenger
       route: `${b.trip.route.fromCity.name} → ${b.trip.route.toCity.name}`,
       date: b.trip.date, bus: b.trip.bus.bus_number,
@@ -160,56 +160,6 @@ r.get("/bookings.csv", wrap(async (req, res) => {
   res.setHeader("Content-Type", "text/csv");
   res.setHeader("Content-Disposition", "attachment; filename=bookings.csv");
   res.send(lines.join("\n"));
-}));
-
-// GET /api/admin/bookers — "Book By" list: jisne booking ki (account) → name, mobile, email
-// + har ek ke neeche uski bookings aur unke seat-time passengers (name, mobile, email, age)
-r.get("/bookers", wrap(async (req, res) => {
-  const q = String(req.query.q || "").trim();
-  const where = { role: "PASSENGER", bookings: { some: {} } };
-  if (q) {
-    where.OR = [
-      { name: { contains: q } },
-      { mobile: { contains: q } },
-      { email: { contains: q } },
-    ];
-  }
-  const users = await prisma.user.findMany({
-    where,
-    select: {
-      id: true, name: true, mobile: true, email: true, created_at: true,
-      bookings: {
-        orderBy: { created_at: "desc" }, take: 50,
-        include: {
-          passengers: true,
-          seats: { include: { seat: true } },
-          trip: { include: { route: { include: { fromCity: true, toCity: true } }, bus: true } },
-        },
-      },
-    },
-    orderBy: { id: "asc" },
-    take: 300,
-  });
-  res.json({
-    bookers: users.map((u) => ({
-      id: u.id,
-      name: u.name || "—",
-      mobile: u.mobile,
-      email: u.email || "",
-      joined: u.created_at,
-      bookings: u.bookings.length,
-      passengers: u.bookings.reduce((n, b) => n + (b.status !== "CANCELLED" ? b.passengers.length : 0), 0),
-      spent: u.bookings.reduce((n, b) => n + (b.status === "CONFIRMED" ? b.total_fare : 0), 0),
-      lastBooking: u.bookings[0]?.created_at || null,
-      recent: u.bookings.slice(0, 12).map((b) => ({
-        pnr: b.pnr, status: b.status, total: b.total_fare,
-        route: `${b.trip.route.fromCity.name} → ${b.trip.route.toCity.name}`,
-        date: b.trip.date, bus: b.trip.bus.bus_number,
-        seats: b.seats.map((s) => s.seat.seat_number).join(", "),
-        passengers: b.passengers.map((p) => ({ name: p.name, age: p.age, gender: p.gender, mobile: p.mobile, email: p.email })),
-      })),
-    })),
-  });
 }));
 
 // ---------- Routes CRUD ----------
