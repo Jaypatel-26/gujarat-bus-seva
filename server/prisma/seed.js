@@ -1,11 +1,13 @@
 // 🌱 Seed: 41 Gujarat cities, route network, fleet + seat layouts,
-// trips for past 1 day → next 4 days, demo bookings, reviews, users.
+// trips for past 1 day → next 10 days, demo bookings, reviews, users.
+// Conductors hain ROUTE-FIXED: har route ka conductor har din wahi (rolling scheduler baaki din sanbhalega).
 // Safe to run multiple times — it skips when data already exists (use `--force` to reset).
 import { PrismaClient } from "@prisma/client";
 import {
   CITIES, CITY_COORDS, ROUTE_PAIRS, BUSES, BUS_TYPES, REVIEW_SNIPPETS,
 } from "../src/data/cities.js";
 import { seatLayoutFor, fareFor, durationMinFor, atTime, genPnr, hashPassword } from "../src/lib/util.js";
+import { buildRouteDayTrips, ensureUpcomingTrips, fixMixedAssignments } from "../src/lib/scheduler.js";
 
 const prisma = new PrismaClient();
 const DAY = 86400000;
@@ -61,35 +63,8 @@ async function ensureConductorPool() {
   return out;
 }
 
-// Agar aaj ke trips kuch hi conductors pe dheel ho (max > 3× ideal) to aaj+bhavi trips ko pool me barabar baanto
-async function rebalanceTrips(drivers) {
-  const todayStart = localDay(0);
-  const todayTrips = await prisma.trip.count({ where: { date: todayStart } });
-  if (!todayTrips || !drivers.length) return;
-  const ideal = Math.ceil(todayTrips / drivers.length);
-  const per = await prisma.trip.groupBy({ by: ["driver_id"], where: { date: todayStart }, _count: { _all: true } });
-  const maxLoad = per.reduce((m, p) => Math.max(m, p._count._all), 0);
-  if (maxLoad <= ideal * 3) return; // pehle se balanced
-  console.log(`🔁 Conductors badh gaye — ${todayTrips} trips ko ${drivers.length} conductors me baant rahe (~${ideal}/conductor/day)…`);
-  // Per-DAY round-robin (ids route-wise blocks me hain — global modulo se din bhar me uneven padta hai)
-  const N = drivers.length;
-  const all = await prisma.trip.findMany({ where: { date: { gte: todayStart } }, select: { id: true, date: true }, orderBy: [{ date: "asc" }, { id: "asc" }] });
-  const byDay = new Map();
-  for (const t of all) {
-    const key = t.date.toISOString().slice(0, 10);
-    if (!byDay.has(key)) byDay.set(key, []);
-    byDay.get(key).push(t.id);
-  }
-  let dayIdx = 0;
-  for (const ids of byDay.values()) {
-    for (let k = 0; k < N; k++) {
-      const chunk = ids.filter((_, i) => i % N === (k + dayIdx) % N); // har din start rotate
-      if (chunk.length) await prisma.trip.updateMany({ where: { id: { in: chunk } }, data: { driver_id: drivers[k].id } });
-    }
-    dayIdx++;
-  }
-  console.log("✅ Trips barabar baant diye");
-}
+// Route-fixed assignment + rolling schedule ab scheduler.js sanbhalta hai
+// (fixMixedAssignments + ensureUpcomingTrips) — purana per-day round-robin hata diya.
 
 async function main() {
   const force = process.argv.includes("--force");
@@ -124,10 +99,11 @@ async function main() {
   // Auto-reseed when seed data (routes/buses) grows beyond what's in the DB
   const stale = cityCount > 0 && (routeCount !== ROUTE_PAIRS.length * 2 || busCount !== BUSES.length);
 
-  // Conductors: pool hamesha ensure karo + trips barabar baanto (pehle hi seeded DB bhi cover)
+  // Conductors: pool hamesha ensure karo + route-fixed assignments theek karo + agle 10 din ke trips ready
   if (cityCount > 0 && !force && !stale) {
-    const pool = await ensureConductorPool();
-    await rebalanceTrips(pool);
+    await ensureConductorPool();
+    await fixMixedAssignments();   // har route ka conductor FIXED — har din wahi (mixed assignments theek)
+    await ensureUpcomingTrips(10); // aaj → +9 din tak har route ke trips pehle se ready
     console.log("ℹ️  Database already seeded — skipping (use `node prisma/seed.js --force` to reset).");
     return;
   }
@@ -183,32 +159,12 @@ async function main() {
   await chunkedCreateMany(prisma.route, routeData);
   const routes = await prisma.route.findMany();
 
-  console.log("🕒 Seeding trips (yesterday → +4 days)…");
-  const SLOT_POOLS = [
-    [[5, 45], [9, 30], [13, 0], [17, 15], [22, 30]],
-    [[6, 15], [10, 0], [14, 30], [18, 45], [23, 15]],
-    [[7, 30], [11, 0], [15, 45], [19, 30], [23, 55]],
-    [[8, 0], [12, 0], [16, 30], [20, 45], [21, 45]],
-  ];
+  console.log("🕒 Seeding trips (yesterday → +10 days, ROUTE-FIXED conductors)…");
   const tripData = [];
   for (const route of routes) {
-    const pool = SLOT_POOLS[route.id % SLOT_POOLS.length];
-    for (let offset = -1; offset <= 4; offset++) {
-      const day = localDay(offset);
-      const nTrips = 3 + (route.id + offset + 6) % 3; // 3–5 departures per day
-      for (let i = 0; i < nTrips; i++) {
-        const [h, m] = pool[i];
-        const bus = busRows[(route.id + i * 3) % busRows.length];
-        const dep = atTime(day, h, m);
-        const dur = durationMinFor(bus.type, route.distance_km);
-        const status = offset < 0 || (offset === 0 && dep < new Date(Date.now() - 60 * 60000)) ? "COMPLETED" : "SCHEDULED";
-        tripData.push({
-          route_id: route.id, bus_id: bus.id,
-          driver_id: drivers[(route.id + i) % drivers.length].id,
-          departure_time: dep, arrival_time: new Date(dep.getTime() + dur * 60000),
-          date: day, status, fare: fareFor(bus.type, route.distance_km),
-        });
-      }
+    for (let offset = -1; offset <= 10; offset++) {
+      // Har route ka conductor fixedDriverForRoute se — har din wahi, kabhi nahi badlega
+      tripData.push(...buildRouteDayTrips(route, localDay(offset), offset, busRows, drivers));
     }
   }
   await chunkedCreateMany(prisma.trip, tripData);

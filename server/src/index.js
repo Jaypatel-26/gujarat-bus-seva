@@ -11,6 +11,7 @@ import reviewRoutes from "./routes/reviews.js";
 import adminRoutes from "./routes/admin.js";
 import driverRoutes from "./routes/driver.js";
 import { razorpayConfigured } from "./lib/razorpay.js";
+import { ensureUpcomingTrips } from "./lib/scheduler.js";
 
 const app = express();
 
@@ -47,4 +48,9 @@ app.use((err, _req, res, _next) => {
 const PORT = Number(process.env.PORT || 4000);
 app.listen(PORT, () => {
   console.log(`🚌 Gujarat Bus Seva API running on http://localhost:${PORT}`);
+  // Rolling schedule: agle 10 din ke trips hamesha ready rakho (route-fixed conductors ke saath)
+  // — boot pe ek baar, phir har 6 ghante (schedule kabhi "khatam" nahi hoga, console kabhi khali nahi dikhega)
+  const runScheduler = () => ensureUpcomingTrips(10).catch((e) => console.error("scheduler:", e.message));
+  setTimeout(runScheduler, 3000); // DB connect settle hone do
+  setInterval(runScheduler, 6 * 3600 * 1000).unref();
 });

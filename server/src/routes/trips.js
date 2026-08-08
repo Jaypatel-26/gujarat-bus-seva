@@ -37,10 +37,12 @@ const SLOT_POOLS = [
 ];
 
 export async function generateTripsForDay(route, day) {
-  const buses = await prisma.bus.findMany();
+  const buses = await prisma.bus.findMany({ orderBy: { id: "asc" } });
   if (!buses.length) return;
-  const drivers = await prisma.user.findMany({ where: { role: "DRIVER" } });
+  const drivers = await prisma.user.findMany({ where: { role: "DRIVER" }, orderBy: { id: "asc" } });
   const pool = SLOT_POOLS[route.id % SLOT_POOLS.length];
+  // Har route ka conductor FIXED (route id se) — har din wahi, kabhi rotate nahi
+  const driver = drivers.length ? drivers[route.id % drivers.length] : null;
   for (let i = 0; i < pool.length; i++) {
     const [h, m] = pool[i];
     const bus = buses[(route.id + i * 3) % buses.length];
@@ -49,7 +51,7 @@ export async function generateTripsForDay(route, day) {
     await prisma.trip.create({
       data: {
         route_id: route.id, bus_id: bus.id,
-        driver_id: drivers.length ? drivers[(route.id + i) % drivers.length].id : null,
+        driver_id: driver ? driver.id : null,
         departure_time: dep, arrival_time: new Date(dep.getTime() + dur * 60000),
         date: day, status: "SCHEDULED", fare: fareFor(bus.type, route.distance_km),
       },
