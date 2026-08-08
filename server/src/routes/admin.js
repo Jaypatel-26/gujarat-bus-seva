@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma, bustCityCache } from "../db.js";
+import { prisma, bustCityCache, bustPopularCache } from "../db.js";
 import { authRequired } from "../middleware/auth.js";
 import { wrap, badRequest, notFound, dayStart, atTime, estDistanceKm, fareFor, durationMinFor, seatLayoutFor, hashPassword } from "../lib/util.js";
 import { BUS_TYPES } from "../data/cities.js";
@@ -232,6 +232,7 @@ r.post("/routes", wrap(async (req, res) => {
     }
   }
 
+  bustPopularCache(); // homepage ka Popular Routes turant naya data dikhaye
   res.json({ ok: true, route, tripsCreated });
 }));
 
@@ -320,6 +321,7 @@ r.put("/routes/:id", wrap(async (req, res) => {
     }
   }
 
+  bustPopularCache();
   res.json({ ok: true, route: updated, tripsUpdated });
 }));
 
@@ -327,6 +329,7 @@ r.delete("/routes/:id", wrap(async (req, res) => {
   const count = await prisma.trip.count({ where: { route_id: Number(req.params.id) } });
   if (count) return res.status(409).json({ error: `Route has ${count} trips — delete those first` });
   await prisma.route.delete({ where: { id: Number(req.params.id) } });
+  bustPopularCache();
   res.json({ ok: true });
 }));
 

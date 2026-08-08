@@ -9,3 +9,11 @@ export async function getCities() {
   return cityCache;
 }
 export function bustCityCache() { cityCache = null; }
+
+// Popular routes ka cache (homepage pe sabse pehle load hota hai — instant rakhna hai)
+let popularCache = null; // { data, ts }
+export function getPopularCache(ttlMs) {
+  return popularCache && Date.now() - popularCache.ts < ttlMs ? popularCache.data : null;
+}
+export function setPopularCache(data) { popularCache = { data, ts: Date.now() }; }
+export function bustPopularCache() { popularCache = null; }

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma, getCities } from "../db.js";
+import { prisma, getCities, getPopularCache, setPopularCache } from "../db.js";
 import {
   wrap, badRequest, notFound, dayStart, atTime,
   fareFor, durationMinFor, estDistanceKm, HOLD_TTL_MS,
@@ -124,28 +124,58 @@ r.get("/search", wrap(async (req, res) => {
 }));
 
 // GET /api/trips/popular — curated homepage routes with starting fares
+// SPEED: 15-min memory cache + sirf 2 DB queries total (pehle 12+ sequential queries the!)
 r.get("/popular", wrap(async (_req, res) => {
+  const cached = getPopularCache(15 * 60000);
+  if (cached) return res.json(cached);
+
   const pairs = [
     ["Ahmedabad", "Surat"], ["Ahmedabad", "Rajkot"], ["Ahmedabad", "Bhuj"],
     ["Surat", "Vadodara"], ["Rajkot", "Jamnagar"], ["Ahmedabad", "Somnath"],
   ];
+  const cities = await getCities();
+  const byName = new Map(cities.map((c) => [c.name, c]));
+
+  // Query 1: saare 6 routes ek saath (missing ho to bana do — fresh DB pe pehli baar)
+  const orConds = [];
+  for (const [a, b] of pairs) {
+    const A = byName.get(a), B = byName.get(b);
+    if (A && B) orConds.push({ from_city_id: A.id, to_city_id: B.id });
+  }
+  const routes = await prisma.route.findMany({ where: { OR: orConds }, include: { fromCity: true, toCity: true } });
+  for (const [a, b] of pairs) {
+    const A = byName.get(a), B = byName.get(b);
+    if (!A || !B || routes.some((x) => x.from_city_id === A.id && x.to_city_id === B.id)) continue;
+    const km = estDistanceKm([A.lat, A.lng], [B.lat, B.lng]);
+    const created = await prisma.route.create({
+      data: { from_city_id: A.id, to_city_id: B.id, distance_km: km, base_fare: fareFor("NON_AC_SEATER", km) },
+      include: { fromCity: true, toCity: true },
+    }).catch(() => null);
+    if (created) routes.push(created);
+  }
+
+  // Query 2: har route ka cheapest upcoming fare — ek hi grouped query me
+  const mins = await prisma.trip.groupBy({
+    by: ["route_id"],
+    where: { route_id: { in: routes.map((x) => x.id) }, departure_time: { gt: new Date() } },
+    _min: { fare: true },
+  });
+  const minFare = new Map(mins.map((m) => [m.route_id, m._min.fare]));
+
   const out = [];
   for (const [a, b] of pairs) {
-    const fromCity = await resolveCity(a), toCity = await resolveCity(b);
-    if (!fromCity || !toCity) continue;
-    const route = await getOrCreateRoute(fromCity, toCity);
-    const cheapest = await prisma.trip.findFirst({
-      where: { route_id: route.id, departure_time: { gt: new Date() } },
-      orderBy: { fare: "asc" },
-    });
+    const r = routes.find((x) => x.fromCity.name === a && x.toCity.name === b);
+    if (!r) continue;
     out.push({
-      from: { id: fromCity.id, name: fromCity.name },
-      to: { id: toCity.id, name: toCity.name },
-      distanceKm: route.distance_km,
-      fromFare: cheapest ? cheapest.fare : fareFor("NON_AC_SEATER", route.distance_km),
+      from: { id: r.fromCity.id, name: a },
+      to: { id: r.toCity.id, name: b },
+      distanceKm: r.distance_km,
+      fromFare: minFare.get(r.id) ?? fareFor("NON_AC_SEATER", r.distance_km),
     });
   }
-  res.json({ popular: out });
+  const payload = { popular: out };
+  setPopularCache(payload);
+  res.json(payload);
 }));
 
 // GET /api/trips/:id/route — full station-wise route plan with scheduled reach times.
